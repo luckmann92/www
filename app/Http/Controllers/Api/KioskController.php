@@ -8,8 +8,11 @@ use Inertia\Inertia;
 
 class KioskController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        if ($request->get('mode') !== 'demo') {
+            die();
+        }
         return Inertia::render('Kiosk');
     }
 }
