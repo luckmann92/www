@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('photos', function (Blueprint $table) {
-            //
+            // Make blur_level nullable with default value of 0
+            $table->integer('blur_level')->default(0)->change();
         });
     }
 
@@ -22,7 +23,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('photos', function (Blueprint $table) {
-            //
+            // Revert to non-nullable with default value of 0
+            $table->integer('blur_level')->default(0)->change();
         });
     }
 };
