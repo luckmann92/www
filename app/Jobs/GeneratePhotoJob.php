@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use Orchid\Attachment\Models\Attachment;
 
 class GeneratePhotoJob implements ShouldQueue
 {
@@ -40,52 +41,92 @@ class GeneratePhotoJob implements ShouldQueue
      * This method:
      *   1. Retrieves the order and its session.
      *   2. Finds the original uploaded photo for the session.
-     *   3. Calls the PhotoComposeService to generate the AI collage via OpenRouter.
-     *   4. Stores the resulting image and a blurred version.
-     *   5. Updates the order status to `ready_blurred`.
+     *   3. Gets additional image URLs from the collage.
+     *   4. Calls the PhotoComposeService to generate the AI collage via GenAPI.
+     *   5. Stores the resulting image and a blurred version.
+     *   6. Updates the order status to `ready_blurred`.
      *
      * @return void
      */
     public function handle()
     {
-        // 1. Load order with related session
-        $order = Order::with('session')->findOrFail($this->orderId);
+        // 1. Load order with related session and collage
+        $order = Order::with(['session', 'collage'])->findOrFail($this->orderId);
         $session = $order->session;
+        $collage = $order->collage;
 
         // 2. Find the original photo for this session
         $originalPhoto = Photo::where('session_id', $session->id)
             ->where('type', 'original')
             ->firstOrFail();
 
-        // 3. Generate AI collage using the service
-        $service = app(PhotoComposeInterface::class);
-        $result = $service->generate(
-            $originalPhoto->path,
-            $order->collage->prompt
-        );
+        try {
+            // 3. Get additional image URLs from collage preview_path
+            $additionalImageUrls = [];
+            if (!empty($collage->preview_path)) {
+                $previewPaths = is_array($collage->preview_path) ? $collage->preview_path : [$collage->preview_path];
 
-        // $result should contain ['image_path' => string, 'blurred_path' => string]
+                foreach ($previewPaths as $previewId) {
+                    // Check if previewId is a valid attachment ID
+                    if (is_numeric($previewId)) {
+                        $attachment = Attachment::find($previewId);
+                        if ($attachment) {
+                            $additionalImageUrls[] = $attachment->url();
+                        }
+                    } elseif (filter_var($previewId, FILTER_VALIDATE_URL)) {
+                        // If it's already a URL, use it directly
+                        $additionalImageUrls[] = $previewId;
+                    } else {
+                        // If it's a relative path, construct the full URL
+                        $additionalImageUrls[] = asset('storage/' . $previewId);
+                    }
+                }
+            }
 
-        // 4. Store result records
-        Photo::create([
-            'session_id' => $session->id,
-            'type' => 'result',
-            'path' => $result['image_path'],
-            'blur_level' => 0,
-            'status' => 'ready',
-        ]);
+            // 4. Generate AI collage using the service
+            $service = app(PhotoComposeInterface::class);
+            $result = $service->generate(
+                $originalPhoto->path,
+                $collage->prompt,
+                $additionalImageUrls
+            );
 
-        Photo::create([
-            'session_id' => $session->id,
-            'type' => 'result',
-            'path' => $result['blurred_path'],
-            'blur_level' => 80,
-            'status' => 'ready_blurred',
-        ]);
+            // $result should contain ['image_path' => string, 'blurred_path' => string]
 
-        // 5. Update order status
-        $order->status = 'ready_blurred';
-        $order->save();
+            // 5. Store result records
+            Photo::create([
+                'session_id' => $session->id,
+                'type' => 'result',
+                'path' => $result['image_path'],
+                'blur_level' => 0,
+                'status' => 'ready',
+            ]);
+
+            Photo::create([
+                'session_id' => $session->id,
+                'type' => 'result',
+                'path' => $result['blurred_path'],
+                'blur_level' => 80,
+                'status' => 'ready_blurred',
+            ]);
+
+            // 6. Update order status
+            $order->status = 'ready_blurred';
+            $order->save();
+        } catch (\Exception $e) {
+            // В случае ошибки генерации обновляем статус заказа
+            $order->status = 'failed';
+            $order->save();
+
+            // Логируем ошибку для отладки
+            \Illuminate\Support\Facades\Log::error("Error generating photo for order {$this->orderId}: " . $e->getMessage(), [
+                'exception' => $e,
+                'order_id' => $this->orderId
+            ]);
+
+            // Бросаем исключение, чтобы система очередей знала об ошибке
+            throw $e;
+        }
 
         // Optionally, broadcast an event for WebSocket updates
         // event(new \App\Events\OrderUpdated($order));

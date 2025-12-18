@@ -90,14 +90,33 @@ const onCollageSelected = async (collageId: number) => {
     return;
   }
 
+  // Устанавливаем состояние загрузки
+  uiStore.setCurrentScreen('processing');
+
   try {
     const response = await apiService.createOrder(sessionStore.sessionToken, collageId);
     orderStore.setOrder(response.data.order_id);
-    uiStore.setCurrentScreen('processing');
+
+    // После получения ответа от сервера (когда генерация завершена),
+    // проверяем статус и переходим к соответствующему экрану
+    if (response.data.status === 'ready_blurred' || response.data.status === 'ready') {
+      // Если изображение уже готово, переходим к размытому результату
+      // Нужно получить URL размытого изображения
+      const orderDetails = await apiService.getOrderStatus(response.data.order_id);
+      if (orderDetails.data.blurred_image_url) {
+        orderStore.setBlurredImage(orderDetails.data.blurred_image_url);
+      }
+      uiStore.setCurrentScreen('blurred');
+    } else {
+      // Если статус другой, остаемся на экране обработки или переходим к соответствующему состоянию
+      uiStore.setCurrentScreen('processing');
+    }
 
     // TODO: Implement WebSocket listener for order updates
   } catch (error) {
     console.error('Failed to create order:', error);
+    // В случае ошибки можно вернуться на предыдущий экран или показать сообщение об ошибке
+    // Пока просто выводим ошибку в консоль
   }
 };
 

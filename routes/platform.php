@@ -24,6 +24,8 @@ use App\Orchid\Screens\Settings\GenApiSettingsScreen;
 use App\Orchid\Screens\Settings\PaymentSettingsScreen;
 use App\Orchid\Screens\Settings\TelegramSettingsScreen;
 use App\Orchid\Screens\Settings\MainSettingsScreen;
+use App\Orchid\Screens\CollageEditScreen;
+use App\Orchid\Screens\CollagesScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -151,5 +153,24 @@ Route::screen('settings/telegram', TelegramSettingsScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.settings')
         ->push('Telegram Settings', route('platform.settings.telegram')));
+
+// Collage Routes
+Route::screen('collages', CollagesScreen::class)
+    ->name('platform.collages')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Collages', route('platform.collages')));
+
+Route::screen('collages/create', CollageEditScreen::class)
+    ->name('platform.collage.create')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.collages')
+        ->push('Create Collage', route('platform.collage.create')));
+
+Route::screen('collages/{collage}/edit', CollageEditScreen::class)
+    ->name('platform.collage.edit')
+    ->breadcrumbs(fn (Trail $trail, $collage) => $trail
+        ->parent('platform.collages')
+        ->push($collage->title ?? 'Edit Collage', route('platform.collage.edit', $collage)));
 
 // Route::screen('idea', Idea::class, 'platform.screens.idea');

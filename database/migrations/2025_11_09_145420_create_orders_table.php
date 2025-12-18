@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('session_id');
             $table->string('collage_id');
             $table->integer('price');
-            $table->string('status')->default('pending'); // pending, ready_blurred, paid, delivered
+            $table->string('status')->default('pending'); // pending, ready_blurred, paid, delivered, failed
             $table->timestamp('paid_at')->nullable();
             $table->timestamps();
         });

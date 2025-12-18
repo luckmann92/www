@@ -17,10 +17,22 @@ class Collage extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'price' => 'integer',
+        // preview_path хранит массив ID загруженных файлов
+        'preview_path' => 'array',
     ];
 
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Get content for table column.
+     *
+     * @return string
+     */
+    public function getContent(): string
+    {
+        return $this->title;
     }
 }

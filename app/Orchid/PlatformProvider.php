@@ -77,6 +77,12 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title(__('Settings'))
                 ->divider(),
 
+            // Collages section
+            Menu::make('Шаблоны коллажей')
+                ->icon('bs.image')
+                ->route('platform.collages')
+                ->title('Контент'),
+
             // Settings section
             Menu::make('Настройки')
                 ->icon('bs.gear')

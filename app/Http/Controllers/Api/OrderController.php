@@ -24,7 +24,7 @@ class OrderController extends Controller
      * Store a newly created resource in storage.
      */
     /**
-     * Create a new order and dispatch photo generation.
+     * Create a new order and generate photo synchronously.
      *
      * Expected payload:
      *   - session_token (int) – ID of the session
@@ -44,7 +44,7 @@ class OrderController extends Controller
         $sessionId = $request->input('session_token');
         $collageId = $request->input('collage_id');
 
-        // Retrieve collage to get price
+        // Retrieve collage to get price and prompt
         $collage = Collage::findOrFail($collageId);
 
         // Create order
@@ -55,13 +55,30 @@ class OrderController extends Controller
             'status' => 'pending',
         ]);
 
-        // Dispatch background job to generate the AI collage
-        GeneratePhotoJob::dispatch($order->id);
+        // Process photo generation synchronously
+        try {
+            // Dispatch job synchronously instead of queuing
+            $job = new GeneratePhotoJob($order->id);
+            $job->handle();
 
-        return response()->json([
-            'order_id' => $order->id,
-            'status' => $order->status,
-        ], 201);
+            // Update order status after successful generation
+            $order->refresh(); // Reload the order to get updated status
+
+            return response()->json([
+                'order_id' => $order->id,
+                'status' => $order->status,
+            ], 201);
+        } catch (\Exception $e) {
+            // In case of error, update order status and return error
+            $order->status = 'failed';
+            $order->save();
+
+            return response()->json([
+                'error' => 'Failed to generate photo: ' . $e->getMessage(),
+                'order_id' => $order->id,
+                'status' => $order->status,
+            ], 500);
+        }
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
@@ -40,17 +42,18 @@ class GenApiService implements \App\Services\PhotoComposeInterface
     {
         $settingsService = new \App\Services\SettingsService();
         $this->endpoint = rtrim($settingsService->get('genapi_endpoint', 'https://api.gen-api.ru/api/v1/networks/gemini-flash-image'), '/');
-        $this->apiKey = $settingsService->get('genapi_api_key', '');
+        $this->apiKey = $settingsService->get('genapi_api_key', 'sk-7vmDaKgIA908LsDOWbU6hoFf1BfTYyF5ORguCOcNSqnrBLqL4IS0dcj4MOxd');
 
         // Initialize ImageManager with GD driver
         $this->imageManager = new ImageManager(new GdDriver());
     }
 
     /**
-     * Generate an AI image based on an original photo and a prompt using GenAPI.
+     * Generate an AI image based on original photos and a prompt using GenAPI.
      *
      * @param string $originalPath Path to the original uploaded photo (relative to storage/app)
      * @param string $prompt       Prompt describing the desired image (from Collage model)
+     * @param array|null $imageUrls Additional image URLs to include in the request (from Collage model)
      *
      * @return array [
      *   'image_path'   => string, // storage path of the generated image
@@ -59,7 +62,7 @@ class GenApiService implements \App\Services\PhotoComposeInterface
      *
      * @throws \Exception on HTTP or processing errors
      */
-    public function generate(string $originalPath, string $prompt): array
+    public function generate(string $originalPath, string $prompt, array $imageUrls = []): array
     {
         // 1. Prepare the original image for sending
         $originalData = Storage::disk('local')->get($originalPath);
@@ -71,86 +74,88 @@ class GenApiService implements \App\Services\PhotoComposeInterface
         // 3. Get the public URL for the temporary file
         $publicTempPath = 'temp/' . basename($tempPath);
         Storage::disk('public')->put($publicTempPath, $originalData);
-        $imageUrl = url('storage/' . $publicTempPath);
+        $originalImageUrl = url('storage/' . $publicTempPath);
 
-        // 4. Build request payload
+
+        // 4. Combine original image URL with additional image URLs from collage
+        $allImageUrls = array_merge([$originalImageUrl], $imageUrls);
+
+        // 5. Build request payload (matching Postman structure)
         $payload = [
-            'prompt' => $prompt,
-            'image_urls' => [$imageUrl],
+            'callback_url' => 'https://vm-8d3a6ab3.na4u.ru/',
+            'prompt' => '"Сделайте кинематографическую фотографию человека, стоящего на красной плозади, неоновые огни которой отражаются в лужах',
             'is_sync' => true, // Use sync mode for immediate response
-            'translate_input' => true,
-            'num_images' => 1,
-            'output_format' => 'jpeg',
-            'aspect_ratio' => '1:1' // Default aspect ratio, can be customized
+            'image_urls' => $allImageUrls,
+            'translate_input' => true
         ];
 
-        // 5. Send request to GenAPI
+         $headers = [
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer '.env('GENAPI_API_KEY'),
+            'Accept' => 'application/json'
+        ];
+
+        $curl = new CurlHttpClient();
+        $response = $curl->post(
+            env('GENAPI_ENDPOINT'),
+            $headers,
+            $payload
+        );
+
+        dd($response);
+        // 6. Send request to GenAPI
+
         $client = new Client([
-            'timeout' => 120,
+             'http_errors' => false,
         ]);
 
-        $response = $client->post($this->endpoint, [
-            'headers' => [
-                'Authorization' => "Bearer {$this->apiKey}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => $payload,
-        ]);
 
-        $body = json_decode($response->getBody()->getContents(), true);
 
-        // 6. Clean up temporary file
+
+   /*     $response = $client->post(env('GENAPI_ENDPOINT'), [
+                'headers' => $headers,
+                'json' => $payload,
+            ]);
+dd($response->getBody()->getContents());*/
+        $request = new Request(
+            'POST',
+            env('GENAPI_ENDPOINT'),
+            $headers,
+            json_encode($payload, JSON_UNESCAPED_UNICODE)
+        );
+       // $response = $client->sendAsync($request)->wait();
+dd($client->send($request));
+       // $body = json_decode($response->getBody()->getContents(), true);
+
+        // 7. Clean up temporary file
         Storage::disk('local')->delete($tempPath);
         Storage::disk('public')->delete($publicTempPath);
 
-        // 7. Handle response
-        if (!isset($body['request_id']) || !isset($body['status'])) {
-            throw new \Exception('Invalid response from GenAPI service.');
+        // 8. Handle response (matching actual GenAPI response structure)
+        if (!isset($body['request_id'])) {
+            throw new \Exception('Invalid response from GenAPI service: ' . json_encode($body));
         }
 
         $requestId = $body['request_id'];
-        $status = $body['status'];
 
-        // In sync mode, the image should be in the response
-        if ($status === 'success' && isset($body['output'])) {
-            $imageData = null;
+        // In sync mode, the image should be in the 'images' array
+        if (isset($body['images']) && is_array($body['images']) && count($body['images']) > 0) {
+            $imageUrl = $body['images'][0];
 
-            // Handle different output formats
-            if (is_string($body['output'])) {
-                // If output is a URL, fetch the image
-                if (filter_var($body['output'], FILTER_VALIDATE_URL)) {
-                    $imageResponse = $client->get($body['output']);
-                    $imageData = $imageResponse->getBody()->getContents();
-                }
-                // If output is a data URI, decode it
-                elseif (Str::contains($body['output'], ';base64,')) {
-                    $parts = explode(';base64,', $body['output'], 2);
-                    $imageData = base64_decode($parts[1]);
-                }
-            } elseif (is_array($body['output']) && isset($body['output'][0])) {
-                // If output is an array of images, take the first one
-                $outputItem = $body['output'][0];
-                if (is_string($outputItem)) {
-                    if (filter_var($outputItem, FILTER_VALIDATE_URL)) {
-                        $imageResponse = $client->get($outputItem);
-                        $imageData = $imageResponse->getBody()->getContents();
-                    } elseif (Str::contains($outputItem, ';base64,')) {
-                        $parts = explode(';base64,', $outputItem, 2);
-                        $imageData = base64_decode($parts[1]);
-                    }
-                }
+            // Fetch the image from URL
+            if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                throw new \Exception('Invalid image URL in GenAPI response: ' . $imageUrl);
             }
 
-            if ($imageData === null) {
-                throw new \Exception('Failed to retrieve generated image from GenAPI response.');
-            }
+            $imageResponse = $client->get($imageUrl);
+            $imageData = $imageResponse->getBody()->getContents();
 
-            // 8. Store the generated image
+            // 9. Store the generated image
             $generatedFilename = Str::uuid() . '.jpg';
             $generatedPath = "photos/results/{$generatedFilename}";
             Storage::disk('local')->put($generatedPath, $imageData);
 
-            // 9. Create blurred version
+            // 10. Create blurred version
             $image = $this->imageManager->read($imageData);
             $image = $image->blur(80); // Apply blur effect
             $blurredData = $image->toJpeg()->toString();
@@ -159,15 +164,14 @@ class GenApiService implements \App\Services\PhotoComposeInterface
             $blurredPath = "photos/results/{$blurredFilename}";
             Storage::disk('local')->put($blurredPath, $blurredData);
 
-            // 10. Return storage paths
+            // 11. Return storage paths
             return [
                 'image_path' => $generatedPath,
                 'blurred_path' => $blurredPath,
             ];
         } else {
-            // If sync mode doesn't return immediately, we can try to poll for the result
-            // But for now, throw an exception if sync mode doesn't return immediately
-            throw new \Exception('GenAPI service did not return a result in sync mode.');
+            // If sync mode doesn't return images, throw an exception
+            throw new \Exception('GenAPI service did not return images in sync mode. Response: ' . json_encode($body));
         }
     }
 
