@@ -10,13 +10,19 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "guzzlehttp/guzzle": "^7.10",
         "inertiajs/inertia-laravel": "^2.0",
+        "intervention/image": "^3.11",
         "irazasyed/telegram-bot-sdk": "^3.15",
         "laravel/fortify": "^1.30",
         "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.39",
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9",
-        "orchid/platform": "^14.52"
+        "orchid/platform": "^14.52",
+        "pusher/pusher-php-server": "^7.2",
+        "spatie/laravel-data": "^4.18",
+        "yoomoney/yookassa-sdk-php": "^3.12"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

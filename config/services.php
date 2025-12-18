@@ -14,25 +14,31 @@ return [
     |
     */
 
-    'postmark' => [
-        'key' => env('POSTMARK_API_KEY'),
+    'genapi' => [
+        'api_key' => env('GENAPI_API_KEY', ''),
+        'endpoint' => env('GENAPI_ENDPOINT', 'https://api.gen-api.ru/api/v1/networks/gemini-flash-image'),
+        'use_genapi' => env('USE_GENAPI_SERVICE', false),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_API_KEY'),
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY', ''),
+        'endpoint' => env('OPENROUTER_ENDPOINT', 'https://openrouter.ai/api/v1'),
+        'model' => env('OPENROUTER_MODEL', 'gpt-image-1'),
     ],
 
-    'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
     ],
 
-    'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
-        ],
+    'payment_provider' => [
+        'key' => env('PAYMENT_PROVIDER_KEY', ''),
+        'base_url' => env('PAYMENT_PROVIDER_BASE_URL', 'https://api.payment.example.com'),
+    ],
+
+    'yookassa' => [
+        'shop_id' => env('YOOKASSA_SHOP_ID', ''),
+        'secret_key' => env('YOOKASSA_SECRET_KEY', ''),
+        'api_key' => env('YOOKASSA_API_KEY', ''),
     ],
 
 ];

@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\Order;
+use App\Models\Collage;
+use App\Models\Photo;
+use App\Jobs\GeneratePhotoJob;
+use Illuminate\Support\Facades\Storage;
+
+class OrderController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index()
+    {
+        //
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    /**
+     * Create a new order and dispatch photo generation.
+     *
+     * Expected payload:
+     *   - session_token (int) – ID of the session
+     *   - collage_id (int) – ID of the selected collage
+     *
+     * Returns:
+     *   - order_id
+     *   - status
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'session_token' => 'required|exists:sessions,id',
+            'collage_id' => 'required|exists:collages,id',
+        ]);
+
+        $sessionId = $request->input('session_token');
+        $collageId = $request->input('collage_id');
+
+        // Retrieve collage to get price
+        $collage = Collage::findOrFail($collageId);
+
+        // Create order
+        $order = Order::create([
+            'session_id' => $sessionId,
+            'collage_id' => $collageId,
+            'price' => $collage->price,
+            'status' => 'pending',
+        ]);
+
+        // Dispatch background job to generate the AI collage
+        GeneratePhotoJob::dispatch($order->id);
+
+        return response()->json([
+            'order_id' => $order->id,
+            'status' => $order->status,
+        ], 201);
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    /**
+     * Show order details, including blurred preview if available.
+     *
+     * Returns:
+     *   - order data (id, status, price, etc.)
+     *   - blurred_image_url (if generated)
+     */
+    public function show(string $id)
+    {
+        $order = Order::with(['collage', 'session'])->findOrFail($id);
+
+        // Attempt to locate a blurred photo for this order
+        $blurred = Photo::where('session_id', $order->session_id)
+            ->where('type', 'result')
+            ->whereNotNull('blur_level')
+            ->first();
+
+        $response = [
+            'order' => $order,
+        ];
+
+        if ($blurred) {
+            $response['blurred_image_url'] = Storage::url($blurred->path);
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        //
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        //
+    }
+}

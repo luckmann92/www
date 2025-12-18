@@ -22,8 +22,6 @@ class PlatformProvider extends OrchidServiceProvider
     public function boot(Dashboard $dashboard): void
     {
         parent::boot($dashboard);
-
-        // ...
     }
 
     /**
@@ -76,7 +74,28 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.shield')
                 ->route('platform.systems.roles')
                 ->permission('platform.systems.roles')
+                ->title(__('Settings'))
                 ->divider(),
+
+            // Settings section
+            Menu::make('Настройки')
+                ->icon('bs.gear')
+                ->route('platform.settings')
+                ->title(__('System'))
+                ->divider(),
+
+            // Operator section (individual entries for better visibility)
+            Menu::make('Operator Dashboard')
+                ->icon('bs.speedometer')
+                ->route('platform.operator.dashboard'),
+
+            Menu::make('Operator Orders')
+                ->icon('bs.list')
+                ->route('platform.operator.orders'),
+
+            Menu::make('Operator Deliveries')
+                ->icon('bs.truck')
+                ->route('platform.operator.deliveries'),
 
             Menu::make('Documentation')
                 ->title('Docs')
@@ -103,6 +122,12 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group(__('System'))
                 ->addPermission('platform.systems.roles', __('Roles'))
                 ->addPermission('platform.systems.users', __('Users')),
+
+            ItemPermission::group('Operator')
+                ->addPermission('platform.operator.dashboard', 'Operator Dashboard')
+                ->addPermission('platform.operator.orders', 'Operator Orders')
+                ->addPermission('platform.operator.deliveries', 'Operator Deliveries')
+                ->addPermission('platform.operator', 'Access Operator Section'),
         ];
     }
 }

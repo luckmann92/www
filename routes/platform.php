@@ -17,6 +17,13 @@ use App\Orchid\Screens\Role\RoleListScreen;
 use App\Orchid\Screens\User\UserEditScreen;
 use App\Orchid\Screens\User\UserListScreen;
 use App\Orchid\Screens\User\UserProfileScreen;
+use App\Orchid\Screens\Operator\DashboardScreen as OperatorDashboardScreen;
+use App\Orchid\Screens\Operator\OrdersScreen as OperatorOrdersScreen;
+use App\Orchid\Screens\Operator\DeliveriesScreen as OperatorDeliveriesScreen;
+use App\Orchid\Screens\Settings\GenApiSettingsScreen;
+use App\Orchid\Screens\Settings\PaymentSettingsScreen;
+use App\Orchid\Screens\Settings\TelegramSettingsScreen;
+use App\Orchid\Screens\Settings\MainSettingsScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -100,5 +107,49 @@ Route::screen('/examples/layouts', ExampleLayoutsScreen::class)->name('platform.
 Route::screen('/examples/grid', ExampleGridScreen::class)->name('platform.example.grid');
 Route::screen('/examples/charts', ExampleChartsScreen::class)->name('platform.example.charts');
 Route::screen('/examples/cards', ExampleCardsScreen::class)->name('platform.example.cards');
+
+// Operator Routes
+Route::screen('operator/dashboard', OperatorDashboardScreen::class)
+    ->name('platform.operator.dashboard')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Operator Dashboard', route('platform.operator.dashboard')));
+
+Route::screen('operator/orders', OperatorOrdersScreen::class)
+    ->name('platform.operator.orders')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.operator.dashboard')
+        ->push('Orders', route('platform.operator.orders')));
+
+Route::screen('operator/deliveries', OperatorDeliveriesScreen::class)
+    ->name('platform.operator.deliveries')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.operator.dashboard')
+        ->push('Deliveries', route('platform.operator.deliveries')));
+
+// Settings Routes
+Route::screen('settings', MainSettingsScreen::class)
+    ->name('platform.settings')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Settings', route('platform.settings')));
+
+Route::screen('settings/genapi', GenApiSettingsScreen::class)
+    ->name('platform.settings.genapi')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.settings')
+        ->push('GenAPI Settings', route('platform.settings.genapi')));
+
+Route::screen('settings/payment', PaymentSettingsScreen::class)
+    ->name('platform.settings.payment')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.settings')
+        ->push('Payment Settings', route('platform.settings.payment')));
+
+Route::screen('settings/telegram', TelegramSettingsScreen::class)
+    ->name('platform.settings.telegram')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.settings')
+        ->push('Telegram Settings', route('platform.settings.telegram')));
 
 // Route::screen('idea', Idea::class, 'platform.screens.idea');
