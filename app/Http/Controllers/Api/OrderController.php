@@ -56,7 +56,7 @@ class OrderController extends Controller
         ]);
 
         // Process photo generation synchronously
-        try {
+     //   try {
             // Dispatch job synchronously instead of queuing
             $job = new GeneratePhotoJob($order->id);
             $job->handle();
@@ -68,7 +68,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'status' => $order->status,
             ], 201);
-        } catch (\Exception $e) {
+      /*  } catch (\Exception $e) {
             // In case of error, update order status and return error
             $order->status = 'failed';
             $order->save();
@@ -78,7 +78,7 @@ class OrderController extends Controller
                 'order_id' => $order->id,
                 'status' => $order->status,
             ], 500);
-        }
+        }*/
     }
 
     /**

@@ -60,7 +60,7 @@ class GeneratePhotoJob implements ShouldQueue
             ->where('type', 'original')
             ->firstOrFail();
 
-        try {
+      //  try {
             // 3. Get additional image URLs from collage preview_path
             $additionalImageUrls = [];
             if (!empty($collage->preview_path)) {
@@ -113,8 +113,8 @@ class GeneratePhotoJob implements ShouldQueue
             // 6. Update order status
             $order->status = 'ready_blurred';
             $order->save();
-        } catch (\Exception $e) {
-            // В случае ошибки генерации обновляем статус заказа
+        //} catch (\Exception $e) {
+        /*    // В случае ошибки генерации обновляем статус заказа
             $order->status = 'failed';
             $order->save();
 
@@ -126,7 +126,7 @@ class GeneratePhotoJob implements ShouldQueue
 
             // Бросаем исключение, чтобы система очередей знала об ошибке
             throw $e;
-        }
+        }*/
 
         // Optionally, broadcast an event for WebSocket updates
         // event(new \App\Events\OrderUpdated($order));

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ca83ade356c648b0c797c1f4a5f22424",
+    "content-hash": "b3ab7549e8c6ab5ac142d437b5a21a7d",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -807,6 +807,58 @@
                 }
             ],
             "time": "2023-10-12T05:21:21+00:00"
+        },
+        {
+            "name": "generative/genapi-sdk-php",
+            "version": "v1.0.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/GenAPI-ru/genapi-sdk-php.git",
+                "reference": "fecd3c32298c7cff0043604642db1f30af25c087"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/GenAPI-ru/genapi-sdk-php/zipball/fecd3c32298c7cff0043604642db1f30af25c087",
+                "reference": "fecd3c32298c7cff0043604642db1f30af25c087",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "GenAPI\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "GenAPI",
+                    "email": "gen-api@gen-api.ru"
+                }
+            ],
+            "description": "This is a developer tool for integration with GenAPI.",
+            "keywords": [
+                "ai",
+                "api",
+                "genapi",
+                "sdk"
+            ],
+            "support": {
+                "issues": "https://github.com/GenAPI-ru/genapi-sdk-php/issues",
+                "source": "https://github.com/GenAPI-ru/genapi-sdk-php/tree/v1.0.1"
+            },
+            "time": "2024-11-04T18:24:38+00:00"
         },
         {
             "name": "graham-campbell/result-type",
@@ -10581,5 +10633,5 @@
         "php": "^8.2"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.6.0"
 }

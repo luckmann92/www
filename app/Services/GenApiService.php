@@ -2,8 +2,13 @@
 
 namespace App\Services;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
+use GenAPI\Client;
+use GenAPI\Exceptions\BadRequestException;
+use GenAPI\Exceptions\BaseException;
+use GenAPI\Exceptions\InternalServerError;
+use GenAPI\Exceptions\NotFoundException;
+use GenAPI\Exceptions\TooManyRequestsException;
+use GenAPI\Exceptions\UnauthorizedException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,14 +22,14 @@ use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 class GenApiService implements \App\Services\PhotoComposeInterface
 {
     /**
-     * @var string GenAPI endpoint
-     */
-    protected string $endpoint;
-
-    /**
      * @var string GenAPI API key
      */
     protected string $apiKey;
+
+    /**
+     * @var Client GenAPI SDK client
+     */
+    protected Client $client;
 
     /**
      * @var ImageManager
@@ -34,15 +39,16 @@ class GenApiService implements \App\Services\PhotoComposeInterface
     /**
      * GenApiService constructor.
      *
-     * Reads configuration from services config:
-     *   services.genapi.endpoint – base URL of the API
-     *   services.genapi.api_key   – secret key
+     * Reads configuration from settings service and initializes GenAPI SDK client.
      */
     public function __construct()
     {
         $settingsService = new \App\Services\SettingsService();
-        $this->endpoint = rtrim($settingsService->get('genapi_endpoint', 'https://api.gen-api.ru/api/v1/networks/gemini-flash-image'), '/');
-        $this->apiKey = $settingsService->get('genapi_api_key', 'sk-7vmDaKgIA908LsDOWbU6hoFf1BfTYyF5ORguCOcNSqnrBLqL4IS0dcj4MOxd');
+        $this->apiKey = $settingsService->get('genapi_api_key', env('GENAPI_API_KEY', ''));
+
+        // Initialize GenAPI SDK client
+        $this->client = new Client();
+        $this->client->setAuthToken('sk-7vmDaKgIA908LsDOWbU6hoFf1BfTYyF5ORguCOcNSqnrBLqL4IS0dcj4MOxd');
 
         // Initialize ImageManager with GD driver
         $this->imageManager = new ImageManager(new GdDriver());
@@ -76,86 +82,66 @@ class GenApiService implements \App\Services\PhotoComposeInterface
         Storage::disk('public')->put($publicTempPath, $originalData);
         $originalImageUrl = url('storage/' . $publicTempPath);
 
-
         // 4. Combine original image URL with additional image URLs from collage
         $allImageUrls = array_merge([$originalImageUrl], $imageUrls);
 
-        // 5. Build request payload (matching Postman structure)
-        $payload = [
-            'callback_url' => 'https://vm-8d3a6ab3.na4u.ru/',
-            'prompt' => '"Сделайте кинематографическую фотографию человека, стоящего на красной плозади, неоновые огни которой отражаются в лужах',
-            'is_sync' => true, // Use sync mode for immediate response
-            'image_urls' => $allImageUrls,
-            'translate_input' => true
-        ];
+      //  try {
+            // 5. Prepare parameters for GenAPI
+            $parameters = [
+                'callback_url' => env('APP_URL'),
+                'prompt' => $prompt,
+                'is_sync' => true,
+                'image_urls' => $allImageUrls,
+                'translate_input' => true,
+            ];
 
-         $headers = [
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer '.env('GENAPI_API_KEY'),
-            'Accept' => 'application/json'
-        ];
-
-        $curl = new CurlHttpClient();
-        $response = $curl->post(
-            env('GENAPI_ENDPOINT'),
-            $headers,
-            $payload
-        );
-
-        dd($response);
-        // 6. Send request to GenAPI
-
-        $client = new Client([
-             'http_errors' => false,
-        ]);
-
-
-
-
-   /*     $response = $client->post(env('GENAPI_ENDPOINT'), [
-                'headers' => $headers,
-                'json' => $payload,
+            Log::info('GenAPI Request', [
+                'network_id' => 'gemini-flash-image',
+                'prompt' => $prompt,
+                'image_urls_count' => count($allImageUrls),
             ]);
-dd($response->getBody()->getContents());*/
-        $request = new Request(
-            'POST',
-            env('GENAPI_ENDPOINT'),
-            $headers,
-            json_encode($payload, JSON_UNESCAPED_UNICODE)
-        );
-       // $response = $client->sendAsync($request)->wait();
-dd($client->send($request));
-       // $body = json_decode($response->getBody()->getContents(), true);
 
-        // 7. Clean up temporary file
-        Storage::disk('local')->delete($tempPath);
-        Storage::disk('public')->delete($publicTempPath);
+            // 6. Generate image using GenAPI SDK
+            $response = $this->client->createNetworkTask('gemini-flash-image', $parameters);
 
-        // 8. Handle response (matching actual GenAPI response structure)
-        if (!isset($body['request_id'])) {
-            throw new \Exception('Invalid response from GenAPI service: ' . json_encode($body));
-        }
+            Log::info('GenAPI Response', [
+                'request_id' => $response['request_id'] ?? null,
+                'cost' => $response['cost'] ?? null,
+            ]);
 
-        $requestId = $body['request_id'];
+            // 7. Clean up temporary files
+            Storage::disk('local')->delete($tempPath);
+            Storage::disk('public')->delete($publicTempPath);
 
-        // In sync mode, the image should be in the 'images' array
-        if (isset($body['images']) && is_array($body['images']) && count($body['images']) > 0) {
-            $imageUrl = $body['images'][0];
+            // 8. Validate response
+            if (!isset($response['request_id'])) {
+                throw new \Exception('Invalid response from GenAPI service: ' . json_encode($response));
+            }
 
-            // Fetch the image from URL
+            // 9. In sync mode, the image should be in the 'images' array
+            if (!isset($response['images']) || !is_array($response['images']) || count($response['images']) === 0) {
+                throw new \Exception('GenAPI service did not return images in sync mode. Response: ' . json_encode($response));
+            }
+
+            $imageUrl = $response['images'][0];
+
+            // 10. Validate image URL
             if (!filter_var($imageUrl, FILTER_VALIDATE_URL)) {
                 throw new \Exception('Invalid image URL in GenAPI response: ' . $imageUrl);
             }
 
-            $imageResponse = $client->get($imageUrl);
-            $imageData = $imageResponse->getBody()->getContents();
+            // 11. Fetch the generated image
+            $imageData = file_get_contents($imageUrl);
+            if ($imageData === false) {
+                throw new \Exception('Failed to download generated image from: ' . $imageUrl);
+            }
 
-            // 9. Store the generated image
+            // 12. Store the generated image
             $generatedFilename = Str::uuid() . '.jpg';
             $generatedPath = "photos/results/{$generatedFilename}";
             Storage::disk('local')->put($generatedPath, $imageData);
 
-            // 10. Create blurred version
+            // 13. Create blurred version
             $image = $this->imageManager->read($imageData);
             $image = $image->blur(80); // Apply blur effect
             $blurredData = $image->toJpeg()->toString();
@@ -164,15 +150,34 @@ dd($client->send($request));
             $blurredPath = "photos/results/{$blurredFilename}";
             Storage::disk('local')->put($blurredPath, $blurredData);
 
-            // 11. Return storage paths
+            // 14. Return storage paths
             return [
                 'image_path' => $generatedPath,
                 'blurred_path' => $blurredPath,
             ];
-        } else {
-            // If sync mode doesn't return images, throw an exception
-            throw new \Exception('GenAPI service did not return images in sync mode. Response: ' . json_encode($body));
-        }
+        /*} catch (BadRequestException | UnauthorizedException | NotFoundException | TooManyRequestsException | InternalServerError | BaseException $e) {
+            // Clean up temporary files on GenAPI SDK error
+            Storage::disk('local')->delete($tempPath);
+            Storage::disk('public')->delete($publicTempPath);
+
+            Log::error('GenAPI SDK Error', [
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'response_body' => method_exists($e, 'getResponseBody') ? $e->getResponseBody() : null,
+            ]);
+
+            throw new \Exception('GenAPI request failed: ' . $e->getMessage(), $e->getCode(), $e);
+        } catch (\Exception $e) {
+            // Clean up temporary files on general error
+            Storage::disk('local')->delete($tempPath);
+            Storage::disk('public')->delete($publicTempPath);
+
+            Log::error('GenAPI Service Error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }*/
     }
 
     /**
@@ -184,16 +189,18 @@ dd($client->send($request));
     public function setApiKey(string $apiKey): void
     {
         $this->apiKey = $apiKey;
+        $this->client->setAuthToken($apiKey);
     }
 
     /**
-     * Set the endpoint for the service
+     * Set the endpoint for the service (not used with SDK, kept for compatibility)
      *
      * @param string $endpoint
      * @return void
      */
     public function setEndpoint(string $endpoint): void
     {
-        $this->endpoint = $endpoint;
+        // SDK handles endpoint internally, this method is kept for interface compatibility
+        Log::warning('setEndpoint called but GenAPI SDK manages endpoints internally');
     }
 }
