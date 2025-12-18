@@ -27,6 +27,9 @@ class PaymentService
             case 'yookassa':
                 $this->paymentProvider = new YookassaService();
                 break;
+            case 'alfabank':
+                $this->paymentProvider = new AlfabankService();
+                break;
             default:
                 // For backward compatibility, use the original implementation
                 $this->paymentProvider = $this->createDefaultProvider();

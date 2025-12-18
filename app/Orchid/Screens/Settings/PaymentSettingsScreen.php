@@ -76,6 +76,7 @@ class PaymentSettingsScreen extends Screen
                             ->title('Платежная система')
                             ->options([
                                 'yookassa' => 'Yookassa',
+                                'alfabank' => 'Альфа-Банк',
                                 'custom' => 'Другая система',
                             ])
                             ->help('Выберите платежную систему'),
@@ -107,6 +108,23 @@ class PaymentSettingsScreen extends Screen
                             ->placeholder('Введите API ключ')
                             ->type('password')
                             ->help('API ключ для доступа к API Yookassa'),
+                    ]),
+                ],
+                'Альфа-Банк' => [
+                    LayoutComponent::rows([
+                        Input::make('settings.alfabank_username')
+                            ->title('Имя пользователя')
+                            ->placeholder('Введите имя пользователя')
+                            ->help('Имя пользователя для доступа к API Альфа-Банка'),
+                        Input::make('settings.alfabank_password')
+                            ->title('Пароль')
+                            ->placeholder('Введите пароль')
+                            ->type('password')
+                            ->help('Пароль для доступа к API Альфа-Банка'),
+                        Input::make('settings.alfabank_base_url')
+                            ->title('Базовый URL')
+                            ->placeholder('https://alfa.rbsuat.com/payment/rest')
+                            ->help('URL для интеграции с API Альфа-Банка'),
                     ]),
                 ],
                 'Другая система' => [
@@ -142,6 +160,9 @@ class PaymentSettingsScreen extends Screen
             'yookassa_shop_id' => $settings['yookassa_shop_id'] ?? null,
             'yookassa_secret_key' => $settings['yookassa_secret_key'] ?? null,
             'yookassa_api_key' => $settings['yookassa_api_key'] ?? null,
+            'alfabank_username' => $settings['alfabank_username'] ?? null,
+            'alfabank_password' => $settings['alfabank_password'] ?? null,
+            'alfabank_base_url' => $settings['alfabank_base_url'] ?? null,
             'payment_provider_key' => $settings['payment_provider_key'] ?? null,
             'payment_provider_endpoint' => $settings['payment_provider_endpoint'] ?? null,
             'order_price' => (int)($settings['order_price'] ?? 250),

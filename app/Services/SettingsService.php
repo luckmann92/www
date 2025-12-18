@@ -64,6 +64,9 @@ class SettingsService
             'yookassa_shop_id' => env('YOOKASSA_SHOP_ID', ''),
             'yookassa_secret_key' => env('YOOKASSA_SECRET_KEY', ''),
             'yookassa_api_key' => env('YOOKASSA_API_KEY', ''),
+            'alfabank_username' => env('ALFABANK_USERNAME', ''),
+            'alfabank_password' => env('ALFABANK_PASSWORD', ''),
+            'alfabank_base_url' => env('ALFABANK_BASE_URL', 'https://alfa.rbsuat.com/payment/rest'),
             'order_price' => env('ORDER_PRICE', 250),
             'photo_ttl_hours' => env('PHOTO_TTL_HOURS', 24),
         ];

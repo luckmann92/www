@@ -66,7 +66,7 @@ class PhotoController extends Controller
             'session_id' => $session->id,
             'type' => 'original',
             'path' => $path,
-            'blur_level' => null,
+            'blur_level' => 0,
             'status' => 'uploaded',
         ]);
 

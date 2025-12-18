@@ -41,4 +41,10 @@ return [
         'api_key' => env('YOOKASSA_API_KEY', ''),
     ],
 
+    'alfabank' => [
+        'username' => env('ALFABANK_USERNAME', ''),
+        'password' => env('ALFABANK_PASSWORD', ''),
+        'base_url' => env('ALFABANK_BASE_URL', 'https://alfa.rbsuat.com/payment/rest'),
+    ],
+
 ];

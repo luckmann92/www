@@ -71,7 +71,7 @@ class GeneratePhotoJob implements ShouldQueue
             'session_id' => $session->id,
             'type' => 'result',
             'path' => $result['image_path'],
-            'blur_level' => null,
+            'blur_level' => 0,
             'status' => 'ready',
         ]);
 
