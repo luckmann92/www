@@ -4,7 +4,7 @@ const API_BASE_URL = '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 3000,
+  timeout: 120000, // 30 seconds timeout for general API requests
 });
 
 export const apiService = {
@@ -26,4 +26,7 @@ export const apiService = {
   initPayment: (orderId, method) => apiClient.post('/payment/init', { order_id: orderId, method }),
   sendDeliveryEmail: (orderId, email) => apiClient.post(`/order/${orderId}/delivery/email`, { email }),
   sendDeliveryPrint: (orderId) => apiClient.post(`/order/${orderId}/delivery/print`),
+
+  // Telegram QR
+  generateTelegramQr: (orderId) => apiClient.post(`/order/${orderId}/telegram-qr`),
 };

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CollageController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\DeliveryController;
+use App\Http\Controllers\Api\TelegramQrController;
 
 
     // Session routes
@@ -32,4 +33,5 @@ use App\Http\Controllers\Api\DeliveryController;
     Route::post('/order/{id}/delivery/telegram', [DeliveryController::class, 'telegram']);
     Route::post('/order/{id}/delivery/email', [DeliveryController::class, 'email']);
     Route::post('/order/{id}/delivery/print', [DeliveryController::class, 'print']);
+
 

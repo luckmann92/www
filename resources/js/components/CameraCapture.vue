@@ -21,7 +21,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 
 const videoRef = ref<HTMLVideoElement | null>(null);
-const timeLeft = ref(10);
+const timeLeft = ref(2);
 const currentPhrase = ref('Приготовься к снимку!');
 const phrases = [
   'Приготовься к снимку!',
@@ -38,7 +38,7 @@ const emit = defineEmits(['photo-captured']);
 const startTimer = () => {
   phraseIndex = 0;
   currentPhrase.value = phrases[phraseIndex];
-  timeLeft.value = 10;
+  timeLeft.value = 2;
 
   countdownId = window.setInterval(() => {
     timeLeft.value--;
