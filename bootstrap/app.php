@@ -21,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'api/*', // Exclude all API routes from CSRF validation
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
