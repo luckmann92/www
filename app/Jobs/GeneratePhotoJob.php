@@ -61,10 +61,10 @@ class GeneratePhotoJob implements ShouldQueue
             ->firstOrFail();
 
       //  try {
-            // 3. Get additional image URLs from collage preview_path
+            // 3. Get additional image URLs from collage images_for_generation
             $additionalImageUrls = [];
-            if (!empty($collage->preview_path)) {
-                $previewPaths = is_array($collage->preview_path) ? $collage->preview_path : [$collage->preview_path];
+            if (!empty($collage->images_for_generation)) {
+                $previewPaths = is_array($collage->images_for_generation) ? $collage->images_for_generation : [$collage->images_for_generation];
 
                 foreach ($previewPaths as $previewId) {
                     // Check if previewId is a valid attachment ID

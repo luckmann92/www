@@ -81,10 +81,17 @@ class CollagesScreen extends Screen
                 TD::make('preview_path', 'Путь к превью')
                     ->render(function (Collage $collage) {
                         $value = '';
-                        if (is_array($collage->preview_path)) {
-                            foreach($collage->preview_path as $attachmentId) {
-                                $attachment = Attachment::find($attachmentId);
-                                $value .= '<img src="' . $attachment->url . '" width="30" height="30" alt="Preview" style="object-fit: cover;">';
+                        if ($collage->preview_path && is_string($collage->preview_path)) {
+                            $attachment = Attachment::find($collage->preview_path);
+                            if ($attachment) {
+                                $value = '<img src="' . $attachment->url . '" width="30" height="30" alt="Preview" style="object-fit: cover;">';
+                            }
+                        } elseif (is_array($collage->preview_path) && count($collage->preview_path) > 0) {
+                            // Обратная совместимость: если старые данные хранятся как массив, берем первый элемент
+                            $attachmentId = $collage->preview_path[0];
+                            $attachment = Attachment::find($attachmentId);
+                            if ($attachment) {
+                                $value = '<img src="' . $attachment->url . '" width="30" height="30" alt="Preview" style="object-fit: cover;">';
                             }
                         }
 

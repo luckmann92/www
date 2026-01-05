@@ -101,6 +101,13 @@ class CollageEditScreen extends Screen
                     ->title('Превью изображение')
                     ->acceptedTypes('.jpg,.jpeg,.png,.webp')
                     ->storage('public')
+                    ->maxFiles(1)
+                    ->required(),
+
+                Upload::make('collage.images_for_generation')
+                    ->title('Изображения для генерации')
+                    ->acceptedTypes('.jpg,.jpeg,.png,.webp')
+                    ->storage('public')
                     ->required(),
 
                 Input::make('collage.price')
@@ -131,6 +138,21 @@ class CollageEditScreen extends Screen
         // Если это новый коллаж, создаем его
         if (!$collage->exists) {
             $collage = new Collage();
+        }
+
+        // Обработка поля preview_path - извлекаем ID из массива, если это массив
+        if (isset($data['collage']['preview_path']) && is_array($data['collage']['preview_path'])) {
+            $previewPath = $data['collage']['preview_path'];
+            // Если массив содержит элементы, берем первый ID
+            if (!empty($previewPath) && is_array($previewPath)) {
+                $data['collage']['preview_path'] = $previewPath[0] ?? null;
+            }
+        }
+
+        // Обработка поля images_for_generation - оставляем как массив
+        if (isset($data['collage']['images_for_generation']) && !is_array($data['collage']['images_for_generation'])) {
+            // Если приходит один элемент, а не массив, создаем массив
+            $data['collage']['images_for_generation'] = [$data['collage']['images_for_generation']];
         }
 
         $collage->fill($data['collage']);

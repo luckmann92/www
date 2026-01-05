@@ -14,5 +14,6 @@ class VerifyCsrfToken extends Middleware
     protected $except = [
         'api/payment/webhook', // Exclude payment webhook from CSRF
         'broadcasting/auth',   // For WebSocket authentication
+        'api/image',           // Exclude image generation from CSRF
     ];
 }

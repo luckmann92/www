@@ -95,10 +95,11 @@ class OrderController extends Controller
     {
         $order = Order::with(['collage', 'session'])->findOrFail($id);
 
-        // Attempt to locate a blurred photo for this order
+        // Attempt to locate a blurred photo for this order (with highest blur level)
         $blurred = Photo::where('session_id', $order->session_id)
             ->where('type', 'result')
             ->whereNotNull('blur_level')
+            ->orderBy('blur_level', 'desc')
             ->first();
 
         $response = [
@@ -106,7 +107,12 @@ class OrderController extends Controller
         ];
 
         if ($blurred) {
-            $response['blurred_image_url'] = Storage::url($blurred->path);
+            // Проверяем, содержит ли путь уже префикс /storage/
+            if (str_starts_with($blurred->path, '/storage/') || str_starts_with($blurred->path, 'storage/')) {
+                $response['blurred_image_url'] = ltrim($blurred->path, '/');
+            } else {
+                $response['blurred_image_url'] = Storage::url($blurred->path);
+            }
         }
 
         return response()->json($response);

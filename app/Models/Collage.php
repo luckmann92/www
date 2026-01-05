@@ -10,6 +10,7 @@ class Collage extends Model
         'title',
         'prompt',
         'preview_path',
+        'images_for_generation',
         'is_active',
         'price',
     ];
@@ -17,8 +18,10 @@ class Collage extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'price' => 'integer',
-        // preview_path хранит массив ID загруженных файлов
-        'preview_path' => 'array',
+        // preview_path хранит ID одного загруженного файла
+        'preview_path' => 'string',
+        // images_for_generation хранит массив ID загруженных файлов
+        'images_for_generation' => 'array',
     ];
 
     public function orders()
