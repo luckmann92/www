@@ -4,16 +4,20 @@ export const useOrderStore = defineStore('order', {
   state: () => ({
     orderId: null,
     orderUuid: null,
+    orderCode: null,
     status: 'idle', // idle, pending, processing, ready_blurred, paid, delivered
     blurredImageUrl: null,
     fullImageUrl: null,
   }),
 
   actions: {
-    setOrder(id, uuid = null) {
+    setOrder(id, uuid = null, code = null) {
       this.orderId = id;
       if (uuid) {
         this.orderUuid = uuid;
+      }
+      if (code) {
+        this.orderCode = code;
       }
       this.status = 'pending';
     },
@@ -24,6 +28,10 @@ export const useOrderStore = defineStore('order', {
 
     setOrderUuid(uuid) {
       this.orderUuid = uuid;
+    },
+
+    setOrderCode(code) {
+      this.orderCode = code;
     },
 
     setBlurredImage(url) {

@@ -42,6 +42,9 @@ Route::prefix('api')->group(function () {
     Route::post('/order/{id}/delivery/email', [DeliveryController::class, 'email']);
     Route::post('/order/{id}/delivery/print', [DeliveryController::class, 'print']);
     Route::post('/order/{id}/telegram-qr', [App\Http\Controllers\Api\TelegramQrController::class, 'generateQr']);
+
+    // Telegram bot webhook
+    Route::post('/telegram/webhook', [App\Http\Controllers\Api\TelegramBotController::class, 'webhook']);
 });
 
 require __DIR__.'/settings.php';

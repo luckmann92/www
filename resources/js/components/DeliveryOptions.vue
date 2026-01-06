@@ -12,7 +12,16 @@
       <div v-else class="flex flex-col items-center">
         <h3 class="text-2xl font-bold text-white mb-4">Получите это фото в Telegram</h3>
         <div class="bg-white p-4 rounded-lg" v-html="qrCodeSvg"></div>
-        <p class="text-white mt-4">Отсканируйте QR-код</p>
+        <p class="text-white mt-4">Отсканируйте QR-код или введите код вручную</p>
+        <div class="mt-2 text-white text-xl font-bold">Код: {{ orderStore.orderCode }}</div>
+        <p class="text-white mt-2">В Telegram боте введите: /start {{ orderStore.orderCode }}</p>
+        <a
+          :href="telegramDeepLink"
+          target="_blank"
+          class="bg-blue-600 text-white text-xl font-bold py-2 px-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors mt-4"
+        >
+          Открыть в Telegram
+        </a>
         <button
           @click="showQrCode = false"
           class="mt-4 text-white underline"
@@ -77,14 +86,14 @@ const sendDelivery = async (channel: 'telegram' | 'email' | 'print') => {
       // The response is SVG content, so we can use it directly
       qrCodeSvg.value = await response.data;
 
-      // Get the order details to retrieve the UUID
+      // Get the order details to retrieve the code
       const orderResponse = await apiService.getOrderStatus(orderStore.orderId);
-      if (orderResponse.data.order && orderResponse.data.order.uuid) {
-        orderStore.setOrderUuid(orderResponse.data.order.uuid);
+      if (orderResponse.data.order && orderResponse.data.order.code) {
+        orderStore.setOrderCode(orderResponse.data.order.code);
 
-        // Generate the deep link URL using the UUID
+        // Generate the deep link URL using the code
         const telegramBotUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'your_bot_username';
-        telegramDeepLink.value = `https://t.me/${telegramBotUsername}?start=${orderResponse.data.order.uuid}`;
+        telegramDeepLink.value = `https://t.me/${telegramBotUsername}?start=${orderResponse.data.order.code}`;
       }
 
       showQrCode.value = true;

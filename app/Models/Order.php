@@ -16,7 +16,26 @@ class Order extends Model
             if (empty($model->uuid)) {
                 $model->uuid = Str::uuid();
             }
+
+            if (empty($model->code)) {
+                $model->code = static::generateUniqueCode();
+            }
         });
+    }
+
+    /**
+     * Generate a unique code in the format XXX-XXX
+     */
+    public static function generateUniqueCode(): string
+    {
+        do {
+            $part1 = rand(100, 999);
+            $part2 = rand(100, 999);
+            $code = "{$part1}-{$part2}";
+            $existing = static::where('code', $code)->first();
+        } while ($existing);
+
+        return $code;
     }
 
     protected $fillable = [

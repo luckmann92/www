@@ -22,9 +22,9 @@ class TelegramQrController extends Controller
     {
         $order = Order::findOrFail($id);
 
-        // Create a unique deep-link URL for Telegram with the order UUID
+        // Create a unique deep-link URL for Telegram with the order code
         $telegramBotUsername = env('TELEGRAM_BOT_USERNAME', 'your_bot_username');
-        $deepLinkUrl = "https://t.me/{$telegramBotUsername}?start={$order->uuid}";
+        $deepLinkUrl = "https://t.me/{$telegramBotUsername}?start={$order->code}";
 
         // Generate QR code
         $renderer = new ImageRenderer(
