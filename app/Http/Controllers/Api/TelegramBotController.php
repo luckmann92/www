@@ -24,6 +24,9 @@ class TelegramBotController extends Controller
 
         $update = $request->all();
 
+         // Log the received message
+        \Illuminate\Support\Facades\Log::info('Telegram Bot Message Received', $update);
+
         // Extract message information
         $message = $update['message'] ?? null;
         if (!$message) {
@@ -32,10 +35,13 @@ class TelegramBotController extends Controller
 
         $chatId = $message['chat']['id'] ?? null;
         $text = $message['text'] ?? '';
+        $userId = $message['from']['id'] ?? null;
+        $userName = $message['from']['first_name'] ?? 'Unknown';
 
         if (!$chatId) {
             return response()->json(['status' => 'no chat id']);
         }
+
 
         // Check if the message is a command with code (e.g., /start ABC-DEF)
         $responseText = "Привет! Отправьте код в формате XXX-XXX, чтобы получить ваше фото.";
