@@ -119,7 +119,11 @@ class TelegramBotController extends Controller
      */
     private function sendMessage(int $chatId, string $text): void
     {
-        $token = config('telegram.bot_token');
+        $token = config('telegram.bot_token') ?: env('TELEGRAM_BOT_TOKEN');
+        if (empty($token)) {
+            \Illuminate\Support\Facades\Log::error('Telegram bot token is not configured');
+            return;
+        }
         $url = "https://api.telegram.org/bot{$token}/sendMessage";
 
         $data = [
@@ -140,7 +144,11 @@ class TelegramBotController extends Controller
      */
     private function sendPhoto(int $chatId, string $photoPath): void
     {
-        $token = config('telegram.bot_token');
+        $token = config('telegram.bot_token') ?: env('TELEGRAM_BOT_TOKEN');
+        if (empty($token)) {
+            \Illuminate\Support\Facades\Log::error('Telegram bot token is not configured');
+            return;
+        }
         $url = "https://api.telegram.org/bot{$token}/sendPhoto";
 
         // Get the full URL for the photo
@@ -179,6 +187,23 @@ class TelegramBotController extends Controller
         ];
 
         $context = stream_context_create($options);
-        file_get_contents($url, false, $context);
+        $result = @file_get_contents($url, false, $context);
+
+        if ($result === false) {
+            \Illuminate\Support\Facades\Log::error('Failed to send message to Telegram API', [
+                'url' => $url,
+                'data' => $data,
+                'error' => error_get_last()
+            ]);
+        } else {
+            $response = json_decode($result, true);
+            if (!$response['ok']) {
+                \Illuminate\Support\Facades\Log::error('Telegram API returned error', [
+                    'url' => $url,
+                    'data' => $data,
+                    'response' => $response
+                ]);
+            }
+        }
     }
 }
