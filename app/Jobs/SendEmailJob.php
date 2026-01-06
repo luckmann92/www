@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use App\Mail\PhotoReadyMail;
 
 class SendEmailJob implements ShouldQueue
 {
@@ -76,14 +77,9 @@ class SendEmailJob implements ShouldQueue
 
         $email = $delivery->meta['to'];
 
-        Mail::raw('Ваше фото в приложении.', function ($message) use ($email, $absolutePath) {
-            $message->to($email)
-                    ->subject('Ваше фото с ИИ-киоска')
-                    ->attach($absolutePath, [
-                        'as' => 'result.jpg',
-                        'mime' => 'image/jpeg',
-                    ]);
-        });
+        // Create and send the mail using our PhotoReadyMail mailable
+        $mail = new PhotoReadyMail($filePath, 'result.jpg');
+        Mail::to($email)->send($mail);
 
         if (Mail::failures()) {
             $delivery->status = 'failed';

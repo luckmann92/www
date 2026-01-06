@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
+use App\Jobs\SendEmailJob;
 use App\Models\Delivery;
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -32,10 +33,10 @@ class DeliveryController extends Controller
             return response()->json(['error' => 'Order is not paid'], 400);
         }
 
-        // Find the non-blurred result image
+        // Find the non-blurred result image (with blur_level = 0)
         $resultPhoto = $order->session->photos()
             ->where('type', 'result')
-            ->whereNull('blur_level')
+            ->where('blur_level', 0)
             ->first();
 
         if (!$resultPhoto) {
@@ -82,10 +83,10 @@ class DeliveryController extends Controller
             return response()->json(['error' => 'Order is not paid'], 400);
         }
 
-        // Find the non-blurred result image
+        // Find the non-blurred result image (with blur_level = 0)
         $resultPhoto = $order->session->photos()
             ->where('type', 'result')
-            ->whereNull('blur_level')
+            ->where('blur_level', 0)
             ->first();
 
         if (!$resultPhoto) {
@@ -104,8 +105,8 @@ class DeliveryController extends Controller
             'status'   => 'pending',
         ]);
 
-        // Dispatch job to send via email (placeholder)
-        // SendEmailJob::dispatch($delivery->id);
+        // Dispatch job to send via email
+        SendEmailJob::dispatch($delivery->id);
 
         return response()->json(['message' => 'Email delivery initiated']);
     }
@@ -131,10 +132,10 @@ class DeliveryController extends Controller
             return response()->json(['error' => 'Order is not paid'], 400);
         }
 
-        // Find the non-blurred result image
+        // Find the non-blurred result image (with blur_level = 0)
         $resultPhoto = $order->session->photos()
             ->where('type', 'result')
-            ->whereNull('blur_level')
+            ->where('blur_level', 0)
             ->first();
 
         if (!$resultPhoto) {
@@ -156,5 +157,61 @@ class DeliveryController extends Controller
         // PrintJob::dispatch($delivery->id);
 
         return response()->json(['message' => 'Print delivery initiated']);
+    }
+
+    /**
+     * Send the final photo via email using order code.
+     *
+     * Expected payload:
+     *   - code (string) – Order code in format XXX-XXX
+     *   - email (string) – Recipient's email address
+     *
+     * Returns:
+     *   - message (string) – Success or error message
+     */
+    public function emailByCode(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|regex:/^\d{3}-\d{3}$/',
+            'email' => 'required|email',
+        ]);
+
+        // Find order by code
+        $order = Order::where('code', $request->input('code'))->first();
+
+        if (!$order) {
+            return response()->json(['error' => 'Order not found with the provided code'], 404);
+        }
+
+        if ($order->status !== 'paid' && $order->status !== 'ready_blurred') {
+            return response()->json(['error' => 'Order is not ready'], 400);
+        }
+
+        // Find the non-blurred result image (with blur_level = 0)
+        $resultPhoto = $order->session->photos()
+            ->where('type', 'result')
+            ->where('blur_level', 0)
+            ->first();
+
+        if (!$resultPhoto) {
+            return response()->json(['error' => 'Result photo not found'], 404);
+        }
+
+        // Create a delivery record
+        $delivery = Delivery::create([
+            'order_id' => $order->id,
+            'channel'  => 'email',
+            'meta'     => [
+                'status' => 'pending',
+                'to'     => $request->input('email'),
+                'file_path' => $resultPhoto->path,
+            ],
+            'status'   => 'pending',
+        ]);
+
+        // Dispatch job to send via email
+        SendEmailJob::dispatch($delivery->id);
+
+        return response()->json(['message' => 'Email delivery initiated']);
     }
 }
