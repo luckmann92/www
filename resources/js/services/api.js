@@ -23,9 +23,10 @@ export const apiService = {
   getOrderStatus: (orderId) => apiClient.get(`/order/${orderId}`),
 
  // Payment
-  initPayment: (orderId, method) => apiClient.post('/payment/init', { order_id: orderId, method }),
-  sendDeliveryEmail: (orderId, email) => apiClient.post(`/order/${orderId}/delivery/email`, { email }),
-  sendDeliveryPrint: (orderId) => apiClient.post(`/order/${orderId}/delivery/print`),
+   initPayment: (orderId, method) => apiClient.post('/payment/init', { order_id: orderId, method }),
+   checkPaymentStatus: (orderId) => apiClient.get(`/payment/status/${orderId}`),
+   sendDeliveryEmail: (orderId, email) => apiClient.post(`/order/${orderId}/delivery/email`, { email }),
+   sendDeliveryPrint: (orderId) => apiClient.post(`/order/${orderId}/delivery/print`),
 
   // Telegram QR
   generateTelegramQr: (orderId) => apiClient.post(`/order/${orderId}/telegram-qr`),

@@ -19,6 +19,10 @@ Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+// Special route for manual payment confirmation in local development
+Route::post('/api/payment/{id}/confirm', [App\Http\Controllers\Api\PaymentController::class, 'confirmPayment'])->where('id', '[0-9]+');
+Route::get('/api/payment/{id}/confirm', [App\Http\Controllers\Api\PaymentController::class, 'confirmPayment'])->where('id', '[0-9]+');
+
 Route::get('/debug', [DebugController::class, 'store']);
 
 Route::prefix('api')->group(function () {
@@ -36,6 +40,7 @@ Route::prefix('api')->group(function () {
     Route::get('/order/{id}', [OrderController::class, 'show']);
 
     Route::post('/payment/init', [PaymentController::class, 'init']);
+    Route::get('/payment/status/{id}', [PaymentController::class, 'status']);
     Route::post('/payment/webhook', [PaymentController::class, 'webhook'    ]);
 
     Route::post('/order/{id}/delivery/telegram', [DeliveryController::class, 'telegram']);
@@ -46,5 +51,7 @@ Route::prefix('api')->group(function () {
     // Telegram bot webhook
     Route::post('/telegram/webhook', [App\Http\Controllers\Api\TelegramBotController::class, 'webhook']);
 });
+
+
 
 require __DIR__.'/settings.php';

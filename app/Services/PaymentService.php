@@ -54,8 +54,26 @@ class PaymentService
     {
         // For backward compatibility, map the method to the new interface
         $description = "Order #{$orderId}";
+
+        // Получаем URL из настроек
+        $returnUrl = env('ALFABANK_RETURN_URL', config('app.url') . '/payment/success');
+        $failUrl = env('ALFABANK_FAIL_URL', config('app.url') . '/payment/fail');
+        $redirectUrl = env('ALFABANK_RETURN_URL', config('app.url') . '/payment/callback');
+
         $options = [
             'payment_method' => $this->mapPaymentMethod($method),
+            'order_id' => $orderId,
+            'return_url' => $returnUrl,
+            'fail_url' => $failUrl,
+            'redirect_url' => $redirectUrl,
+            'is_mobile' => true, // Устанавливаем для мобильного отображения
+            'currency' => '643', // RUB
+            'json_params' => [
+                'customer' => [
+                    'email' => null,
+                    'phone' => null,
+                ]
+            ],
             'metadata' => [
                 'order_id' => $orderId,
                 'method' => $method,
@@ -111,6 +129,24 @@ class PaymentService
                 // Placeholder implementation for backward compatibility
                 $paymentId = uniqid('pay_', true);
                 $method = $options['metadata']['method'] ?? 'bank_card';
+
+                // Если это локальная разработка и метод alfapay, возвращаем статичный QR-код
+                if (app()->environment('local') && $method === 'alfapay') {
+                    $qrCodePath = resource_path('img/qr-code.gif');
+                    if (file_exists($qrCodePath)) {
+                        $qrCodeContent = file_get_contents($qrCodePath);
+                        $qrCodeBase64 = base64_encode($qrCodeContent);
+
+                        return [
+                            'payment_id' => $paymentId,
+                            'status' => 'pending',
+                            'confirmation_url' => null,
+                            'qr_code' => $qrCodeBase64,
+                            'qr_url' => null,
+                        ];
+                    }
+                }
+
                 $paymentUrl = $method === 'sbp'
                     ? "https://qr.nspk.ru/qr/{$paymentId}.png"
                     : "https://payment.example.com/pay/{$paymentId}";
@@ -157,6 +193,8 @@ class PaymentService
                 return 'sbp';
             case 'mir':
                 return 'bank_card';
+            case 'alfapay':
+                return 'qr_code';
             default:
                 return 'bank_card';
         }

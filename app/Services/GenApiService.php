@@ -107,7 +107,7 @@ class GenApiService implements \App\Services\PhotoComposeInterface
             "cost" => 9.75,
             "model" => "gemini-flash-image",
             "images" => [
-                0 => "https://gen-api.storage.yandexcloud.net/input_files/1767609489_695b9491630c4.jpg"
+                0 => "https://vm-8d3a6ab3.na4u.ru/tmp/1767609489_695b9491630c4.jpg"
             ]
         ];
 

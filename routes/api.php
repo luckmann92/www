@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\TelegramQrController;
 
     // Payment routes
     Route::post('/payment/init', [PaymentController::class, 'init']);
+    Route::get('/payment/status/{id}', [PaymentController::class, 'status']);
     Route::post('/payment/webhook', [PaymentController::class, 'webhook']);
 
     // Delivery routes

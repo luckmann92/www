@@ -7,8 +7,8 @@
       <PreviewPhoto v-else-if="uiStore.currentScreen === 'preview'" :photo="currentPhoto" @retake="retakePhoto" @confirm="confirmPhoto" />
       <CollageSelect v-else-if="uiStore.currentScreen === 'collage'" @collage-selected="onCollageSelected" />
       <ProgressScreen v-else-if="uiStore.currentScreen === 'processing'" />
-      <BlurredResult v-else-if="uiStore.currentScreen === 'blurred'" :imageUrl="orderStore.blurredImageUrl || ''" @unlock-requested="initiatePayment" />
-      <PaymentOptions v-else-if="uiStore.currentScreen === 'payment'" @payment-initiated="onPaymentInitiated" />
+      <BlurredResult v-else-if="uiStore.currentScreen === 'blurred'" :imageUrl="orderStore.blurredImageUrl || ''" @payment-requested="initiatePayment" />
+      <PaymentOptions v-else-if="uiStore.currentScreen === 'payment'" @payment-initiated="onPaymentInitiated" @payment-success="onPaymentSuccess" />
       <DeliveryOptions v-else-if="uiStore.currentScreen === 'delivery'" @delivery-sent="onDeliverySent" />
       <ThankYou v-else-if="uiStore.currentScreen === 'thank-you'" />
     </div>
@@ -120,13 +120,20 @@ const onCollageSelected = async (collageId: number) => {
   }
 };
 
-const initiatePayment = () => {
+const initiatePayment = async () => {
+  // Инициируем оплату через Альфа-банк и сразу переходим к экрану оплаты
+  // Это позволяет избежать выбора способа оплаты, т.к. используется только QR-код Альфа-банка
   uiStore.setCurrentScreen('payment');
 };
 
 const onPaymentInitiated = () => {
   // Payment initiated, wait for webhook/WS to update order status
-  // For now, simulate a successful payment and move to delivery
+  // Do not set status to 'paid' immediately - let the status checking mechanism handle it
+  // The payment status will be checked by PaymentOptions component
+};
+
+const onPaymentSuccess = () => {
+  // Payment confirmed successfully, move to delivery screen
   orderStore.updateStatus('paid');
   uiStore.setCurrentScreen('delivery');
 };

@@ -14,10 +14,9 @@ class AlfabankService implements PaymentInterface
 
     public function __construct()
     {
-        $settingsService = new SettingsService();
-        $this->userName = $settingsService->get('alfabank_username', '');
-        $this->password = $settingsService->get('alfabank_password', '');
-        $this->baseUrl = $settingsService->get('alfabank_base_url', 'https://alfa.rbsuat.com/payment/rest');
+        $this->userName = env('ALFABANK_USERNAME', '');
+        $this->password = env('ALFABANK_PASSWORD', '');
+        $this->baseUrl = env('ALFABANK_BASE_URL', 'https://alfa.rbsuat.com/payment/rest');
 
         $this->httpClient = new Client([
             'base_uri' => $this->baseUrl,
@@ -38,19 +37,47 @@ class AlfabankService implements PaymentInterface
      */
     public function createPayment(float $amount, string $description, array $options = []): array
     {
-        $returnUrl = $options['return_url'] ?? config('app.url');
+        // Проверяем, если это локальная разработка, используем тестовый режим
+        if (app()->environment('local')) {
+            // Возвращаем статичный QR-код для локальной разработки
+            $qrCodePath = resource_path('img/qr-code.gif');
+            if (file_exists($qrCodePath)) {
+                $qrCodeContent = file_get_contents($qrCodePath);
+                $qrCodeBase64 = base64_encode($qrCodeContent);
+
+                $orderId = $options['order_id'] ?? uniqid('order_', true);
+
+                return [
+                    'payment_id' => $orderId,
+                    'status' => 'pending',
+                    'confirmation_url' => null,
+                    'qr_code' => $qrCodeBase64,
+                    'qr_url' => null,
+                ];
+            } else {
+                // Если файл не найден, выбрасываем исключение
+                throw new \Exception("QR code image not found at: " . $qrCodePath);
+            }
+        }
+
+        $returnUrl = $options['return_url'] ?? env('ALFABANK_RETURN_URL', config('app.url'));
+        $failUrl = $options['fail_url'] ?? env('ALFABANK_FAIL_URL', config('app.url'));
         $orderId = $options['order_id'] ?? uniqid('order_', true);
-        $currency = $options['currency'] ?? 'RUB';
+        $currency = $options['currency'] ?? '643'; // 643 is code for RUB
         $customerKey = $options['customer_key'] ?? null;
         $merchantLogin = $options['merchant_login'] ?? $this->userName;
+        $isMobile = $options['is_mobile'] ?? false;
+        $jsonParams = $options['json_params'] ?? null;
 
         $params = [
             'userName' => $this->userName,
             'password' => $this->password,
             'orderNumber' => $orderId,
-            'amount' => $amount * 100, // Convert to kopecks
-            'currencyCode' => $currency,
+            'amount' => (int)($amount * 100), // Convert to kopecks
+            'currency' => $currency,
             'returnUrl' => $returnUrl,
+            'failUrl' => $failUrl,
+            'description' => $description ?? 'Оплата заказа #' . $orderId,
         ];
 
         if ($customerKey) {
@@ -61,8 +88,14 @@ class AlfabankService implements PaymentInterface
             $params['merchantLogin'] = $merchantLogin;
         }
 
-        if (isset($options['description'])) {
-            $params['orderDescription'] = $options['description'];
+        // Если пользователь на мобильном
+        if ($isMobile) {
+            $params['pageView'] = 'MOBILE';
+        }
+
+        // Добавляем jsonParams если они есть
+        if ($jsonParams) {
+            $params['jsonParams'] = json_encode($jsonParams);
         }
 
         $response = $this->httpClient->post('/register.do', [
@@ -75,11 +108,26 @@ class AlfabankService implements PaymentInterface
             throw new \Exception("Alfabank API error: " . ($result['errorMessage'] ?? 'Unknown error'));
         }
 
+        // Сохраняем orderId из ответа Альфа-банка
+        $alfabankOrderId = $result['orderId'] ?? null;
+
+        // Если успешно зарегистрировали заказ, генерируем QR-код
+        if ($alfabankOrderId) {
+            $qrCodeData = $this->generateQrCode($alfabankOrderId, $options);
+
+            return [
+                'payment_id' => $alfabankOrderId,
+                'status' => 'pending',
+                'confirmation_url' => $result['formUrl'] ?? null,
+                'qr_code' => $qrCodeData['qr_code'] ?? null,
+                'qr_url' => $qrCodeData['qr_url'] ?? null,
+            ];
+        }
+
         return [
-            'payment_id' => $result['orderId'] ?? $orderId,
+            'payment_id' => $alfabankOrderId ?? $orderId,
             'status' => 'pending',
             'confirmation_url' => $result['formUrl'] ?? null,
-            'redirect_url' => $result['formUrl'] ?? null,
         ];
     }
 
@@ -158,5 +206,44 @@ class AlfabankService implements PaymentInterface
         }
 
         return false;
+    }
+
+    /**
+     * Generate QR code for payment via Alfabank
+     *
+     * @param string $orderId Order ID in Alfabank system
+     * @param array $options Additional options
+     * @return array
+     */
+    public function generateQrCode(string $orderId, array $options = []): array
+    {
+        $redirectUrl = $options['redirect_url'] ?? env('ALFABANK_RETURN_URL', config('app.url') . '/payment/callback');
+        $qrWidth = $options['qr_width'] ?? 300;
+        $qrHeight = $options['qr_height'] ?? 300;
+
+        $params = [
+            'userName' => $this->userName,
+            'password' => $this->password,
+            'mdOrder' => $orderId,
+            'redirectUrl' => $redirectUrl, // Обязательный URL возврата после оплаты в приложении банка
+            'qrFormat' => 'image', // Получаем QR в Base64
+            'qrWidth' => $qrWidth,
+            'qrHeight' => $qrHeight,
+        ];
+
+        $response = $this->httpClient->post('/qr/register.do', [
+            'form_params' => $params,
+        ]);
+
+        $result = json_decode($response->getBody()->getContents(), true);
+
+        if (isset($result['errorCode']) && $result['errorCode'] != 0) {
+            throw new \Exception("Alfabank QR API error: " . ($result['errorMessage'] ?? 'Unknown error'));
+        }
+
+        return [
+            'qr_code' => $result['renderedQr'] ?? null, // QR в формате PNG, закодированный в Base64
+            'qr_url' => $result['payload'] ?? null,     // URL QR-кода (можно отобразить как ссылку)
+        ];
     }
 }
