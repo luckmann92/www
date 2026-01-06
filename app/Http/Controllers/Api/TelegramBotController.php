@@ -97,7 +97,7 @@ class TelegramBotController extends Controller
         // Find the non-blurred result image
         $resultPhoto = $order->session->photos()
             ->where('type', 'result')
-            ->whereNull('blur_level')
+            ->where('blur_level', 0)
             ->first();
 
         if (!$resultPhoto) {
