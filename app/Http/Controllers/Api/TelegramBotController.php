@@ -53,7 +53,8 @@ class TelegramBotController extends Controller
                     $responseText = "Неверный формат кода. Пожалуйста, введите код в формате XXX-XXX (например, 123-456).";
                 }
             } else {
-                $responseText = "Пожалуйста, укажите код после команды /start. Например: /start 123-456";
+                // Send welcome message when /start is used without parameters
+                $responseText = "Привет! Я бот для отправки фото. Отправь номер, указанный на дисплее.";
             }
         } elseif (preg_match('/^\d{3}-\d{3}$/', $text)) {
             // Direct code input (XXX-XXX)
