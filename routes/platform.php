@@ -26,6 +26,7 @@ use App\Orchid\Screens\Settings\TelegramSettingsScreen;
 use App\Orchid\Screens\Settings\MainSettingsScreen;
 use App\Orchid\Screens\CollageEditScreen;
 use App\Orchid\Screens\CollagesScreen;
+use App\Orchid\Screens\MainScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -41,7 +42,7 @@ use Tabuna\Breadcrumbs\Trail;
 */
 
 // Main
-Route::screen('/main', PlatformScreen::class)
+Route::screen('/main', MainScreen::class)
     ->name('platform.main');
 
 // Platform > Profile
