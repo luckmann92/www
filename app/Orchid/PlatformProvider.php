@@ -37,17 +37,22 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title('Navigation')
                 ->route(config('platform.index')),
 
-            Menu::make('Sample Screen')
+            // Collages section
+            Menu::make('Шаблоны коллажей')
+                ->icon('bs.image')
+                ->route('platform.collages')
+                ->title('Контент'),
+            /*Menu::make('Sample Screen')
                 ->icon('bs.collection')
                 ->route('platform.example')
-                ->badge(fn () => 6),
+                ->badge(fn () => 6),*/
 
-            Menu::make('Form Elements')
-                ->icon('bs.card-list')
-                ->route('platform.example.fields')
-                ->active('*/examples/form/*'),
+            //Menu::make('Form Elements')
+            //    ->icon('bs.card-list')
+            //    ->route('platform.example.fields')
+            //    ->active('*/examples/form/*'),
 
-            Menu::make('Layouts Overview')
+            /*Menu::make('Layouts Overview')
                 ->icon('bs.window-sidebar')
                 ->route('platform.example.layouts'),
 
@@ -62,7 +67,7 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Cards')
                 ->icon('bs.card-text')
                 ->route('platform.example.cards')
-                ->divider(),
+                ->divider(),*/
 
             Menu::make(__('Users'))
                 ->icon('bs.people')
@@ -77,11 +82,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title(__('Settings'))
                 ->divider(),
 
-            // Collages section
-            Menu::make('Шаблоны коллажей')
-                ->icon('bs.image')
-                ->route('platform.collages')
-                ->title('Контент'),
+
 
             // Settings section
             Menu::make('Настройки')
