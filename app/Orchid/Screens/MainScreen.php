@@ -39,24 +39,23 @@ class MainScreen extends Screen
             ->pluck('count', 'status');
 
         // Количество оплаченных заказов
-        $paidOrders = Order::whereBetween('created_at', [$startDate, $endDate])
-            ->where('status', 'paid')
+        $paidOrders = Order::where('status', 'paid')
             ->count();
 
         // Общая сумма оплат
-        $totalRevenue = Order::whereBetween('created_at', [$startDate, $endDate])
+        $totalRevenue = Order::whereBetween('paid_at', [$startDate, $endDate])
             ->where('status', 'paid')
             ->sum('price');
 
-        // График заказов по дням
-        $ordersByDay = Order::selectRaw('DATE(created_at) as date, COUNT(*) as count')
+        // График заказов по дням (только созданные заказы)
+        $ordersByDayData = Order::selectRaw('DATE(created_at) as date, COUNT(*) as count')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        $dates = $ordersByDay->pluck('date')->toArray();
-        $counts = $ordersByDay->pluck('count')->toArray();
+        $dates = $ordersByDayData->pluck('date')->toArray();
+        $counts = $ordersByDayData->pluck('count')->toArray();
 
         // Подготовка данных для графиков
         $chartData = [
@@ -105,15 +104,47 @@ class MainScreen extends Screen
         ];
 
         // Подготовка данных для доходов по дням
-        $revenueByDay = Order::selectRaw('DATE(created_at) as date, SUM(price) as revenue')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->whereNotNull('paid_at')
+        $revenueByDay = Order::selectRaw('DATE(paid_at) as date, SUM(price) as revenue')
+            ->whereBetween('paid_at', [$startDate, $endDate])
+            ->where('status', 'paid')
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        $revenueDates = $revenueByDay->pluck('date')->toArray();
-        $revenueValues = $revenueByDay->pluck('revenue')->toArray();
+        // Создаем массив всех дат в диапазоне для корректного отображения графика
+        $period = $startDate->copy()->diffInDays($endDate) + 1;
+        $allDates = [];
+        $allValues = [];
+
+        for ($i = 0; $i < $period; $i++) {
+            $date = $startDate->copy()->addDays($i)->format('Y-m-d');
+            $allDates[] = $date;
+
+            // Найти значение дохода для этой даты или использовать 0
+            $revenueForDate = $revenueByDay->firstWhere('date', $date);
+            $allValues[] = $revenueForDate ? (int)$revenueForDate->revenue : 0;
+        }
+
+        // Убираем нули в начале и конце, чтобы график не начинался и не заканчивался нулями
+        $startIndex = 0;
+        $endIndex = count($allValues) - 1;
+
+        while ($startIndex < count($allValues) && $allValues[$startIndex] == 0) {
+            $startIndex++;
+        }
+
+        while ($endIndex >= $startIndex && $allValues[$endIndex] == 0) {
+            $endIndex--;
+        }
+
+        if ($startIndex <= $endIndex) {
+            $revenueDates = array_slice($allDates, $startIndex, $endIndex - $startIndex + 1);
+            $revenueValues = array_slice($allValues, $startIndex, $endIndex - $startIndex + 1);
+        } else {
+            // Если все значения нули, оставляем хотя бы один элемент для отображения оси
+            $revenueDates = $allDates;
+            $revenueValues = $allValues;
+        }
 
         $revenueData = [
             [
