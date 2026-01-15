@@ -73,6 +73,11 @@ class GenApiService implements \App\Services\PhotoComposeInterface
         // 4. Combine original image URL with additional image URLs from collage
         $allImageUrls = array_merge([$originalImageUrl], $imageUrls);
 
+        // Получаем настройки из БД
+        $settingsService = new \App\Services\SettingsService();
+        $apiKey = $settingsService->get('genapi_api_key', getenv('GENAPI_API_KEY'));
+        $endpoint = $settingsService->get('genapi_endpoint', env('GENAPI_ENDPOINT'));
+
         $client = new Client([
             'timeout' => 30000,
             'verify' => false // Отключаем проверку SSL-сертификата
@@ -81,7 +86,7 @@ class GenApiService implements \App\Services\PhotoComposeInterface
         $headers = [
             'Content-Type'  => 'application/json',
             'Accept'        => 'application/json',
-            'Authorization' => "Bearer ".getenv('GENAPI_API_KEY')
+            'Authorization' => "Bearer {$apiKey}"
         ];
 
         $data = [
@@ -93,7 +98,7 @@ class GenApiService implements \App\Services\PhotoComposeInterface
         ];
 
         /*$response = $client->post(
-            env('GENAPI_ENDPOINT'),
+            $endpoint,
             [
                 'json' => $data,
                 'headers' => $headers

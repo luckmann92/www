@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
@@ -47,10 +48,11 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
     }
 
     /**
-     * Generate an AI image based on an original photo and a prompt using OpenRouter.
+     * Generate an AI image based on original photos and a prompt using OpenRouter.
      *
      * @param string $originalPath Path to the original uploaded photo (relative to storage/app)
      * @param string $prompt       Prompt describing the desired image (from Collage model)
+     * @param array|null $imageUrls Additional image URLs to include in the request (from Collage model)
      *
      * @return array [
      *   'image_path'   => string, // storage path of the generated image
@@ -59,7 +61,7 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
      *
      * @throws \Exception on HTTP or processing errors
      */
-    public function generate(string $originalPath, string $prompt): array
+    public function generate(string $originalPath, string $prompt, array $imageUrls = []): array
     {
         // 1. Prepare the original image for sending
         $originalData = Storage::disk('local')->get($originalPath);
@@ -71,70 +73,97 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
         // 3. Get the public URL for the temporary file
         $publicTempPath = 'temp/' . basename($tempPath);
         Storage::disk('public')->put($publicTempPath, $originalData);
-        $imageUrl = url('storage/' . $publicTempPath);
+        $originalImageUrl = url('storage/' . $publicTempPath);
 
-        // 4. Build request payload
+        // 4. Combine original image URL with additional image URLs from collage
+        $allImageUrls = array_merge([$originalImageUrl], $imageUrls);
+
+        // 5. Build content array with all images
+        $content = [
+            [
+                'type' => 'text',
+                'text' => $prompt
+            ]
+        ];
+
+        // Add all images to content
+        foreach ($allImageUrls as $imgUrl) {
+            $content[] = [
+                'type' => 'image_url',
+                'image_url' => [
+                    'url' => $imgUrl
+                ]
+            ];
+        }
+
+        // 6. Build request payload
         $payload = [
             'model' => 'google/gemini-2.5-flash-image-preview',
             'messages' => [
                 [
                     'role' => 'user',
-                    'content' => [
-                        [
-                            'type' => 'text',
-                            'text' => $prompt
-                        ],
-                        [
-                            'type' => 'image_url',
-                            'image_url' => [
-                                'url' => $imageUrl
-                            ]
-                        ]
-                    ]
+                    'content' => $content
                 ]
             ],
             'modalities' => ['image', 'text']
         ];
 
-        // 5. Send request to OpenRouter
+        // 7. Send request to OpenRouter
         $client = new Client([
             'timeout' => 120,
-            'headers' => [
-                'Authorization' => "Bearer {$this->apiKey}",
-                'Content-Type' => 'application/json',
-            ]
+            'verify' => false // Отключаем проверку SSL-сертификата
+        ]);
+
+        Log::info('OpenRouter Request', [
+            'model' => 'google/gemini-2.5-flash-image-preview',
+            'prompt' => $prompt,
+            'image_urls_count' => count($allImageUrls),
         ]);
 
         try {
             $response = $client->post($this->endpoint, [
                 'json' => $payload,
+                'headers' => [
+                    'Authorization' => "Bearer {$this->apiKey}",
+                    'Content-Type' => 'application/json',
+                ]
             ]);
 
             $body = json_decode($response->getBody()->getContents(), true);
+
+            Log::info('OpenRouter Response', [
+                'status' => 'success',
+                'choices_count' => count($body['choices'] ?? []),
+            ]);
         } catch (\GuzzleHttp\Exception\ClientException $e) {
             // Обработка клиентских ошибок (4xx)
             $responseBody = $e->getResponse()->getBody()->getContents();
             $errorMessage = "Client error: {$e->getMessage()}. Response: {$responseBody}";
+            Log::error('OpenRouter Client Error', ['error' => $errorMessage]);
             throw new \Exception($errorMessage);
         } catch (\GuzzleHttp\Exception\ServerException $e) {
             // Обработка серверных ошибок (5xx)
             $responseBody = $e->getResponse()->getBody()->getContents();
             $errorMessage = "Server error: {$e->getMessage()}. Response: {$responseBody}";
+            Log::error('OpenRouter Server Error', ['error' => $errorMessage]);
             throw new \Exception($errorMessage);
         } catch (\GuzzleHttp\Exception\RequestException $e) {
             // Обработка других ошибок запроса
             $errorMessage = "Request error: {$e->getMessage()}";
+            Log::error('OpenRouter Request Error', ['error' => $errorMessage]);
             throw new \Exception($errorMessage);
         } catch (\Exception $e) {
             // Обработка прочих ошибок
-            throw new \Exception("Error communicating with OpenRouter service: " . $e->getMessage());
+            $errorMessage = "Error communicating with OpenRouter service: " . $e->getMessage();
+            Log::error('OpenRouter Error', ['error' => $errorMessage]);
+            throw new \Exception($errorMessage);
         }
 
-        // 6. Clean up temporary file
+        // 8. Clean up temporary file
         Storage::disk('local')->delete($tempPath);
         Storage::disk('public')->delete($publicTempPath);
 
-        // 7. Handle response
+        // 9. Handle response
         if (!isset($body['choices']) || !is_array($body['choices']) || empty($body['choices'])) {
             throw new \Exception('Invalid response from OpenRouter service.');
         }
@@ -171,21 +200,33 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
             throw new \Exception('Failed to retrieve generated image from OpenRouter response.');
         }
 
-        // 8. Store the generated image
+        // 10. Store the generated image in public storage
         $generatedFilename = Str::uuid() . '.jpg';
         $generatedPath = "photos/results/{$generatedFilename}";
-        Storage::disk('local')->put($generatedPath, $imageData);
+        Storage::disk('public')->put($generatedPath, $imageData);
 
-        // 9. Create blurred version
-        $image = $this->imageManager->read($imageData);
+        // 11. Create blurred version using temporary file (like GenApiService)
+        $tempPath = storage_path('app/temp/' . Str::uuid() . '.jpg');
+        // Создаем директорию, если она не существует
+        $tempDir = dirname($tempPath);
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+        file_put_contents($tempPath, $imageData);
+
+        // Загружаем изображение из временного файла для создания blur-версии
+        $image = $this->imageManager->read($tempPath);
         $image = $image->blur(80); // Apply blur effect
         $blurredData = $image->toJpeg()->toString();
 
-        $blurredFilename = Str::uuid() . '.jpg';
-        $blurredPath = "photos/results/{$blurredFilename}";
-        Storage::disk('local')->put($blurredPath, $blurredData);
+        // Удаляем временный файл
+        unlink($tempPath);
 
-        // 10. Return storage paths
+        $blurredFilename = Str::uuid() . '-bl.jpg';
+        $blurredPath = "photos/results/{$blurredFilename}";
+        Storage::disk('public')->put($blurredPath, $blurredData);
+
+        // 12. Return storage paths
         return [
             'image_path' => $generatedPath,
             'blurred_path' => $blurredPath,

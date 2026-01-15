@@ -18,12 +18,17 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PhotoComposeInterface::class, function ($app) {
             // Check settings to determine which service to use
             $settingsService = new \App\Services\SettingsService();
-            $useGenApi = $settingsService->get('use_genapi_service', false);
+            $activeService = $settingsService->get('active_service', 'openrouter');
 
-            if ($useGenApi) {
+            // Для обратной совместимости проверяем старую настройку
+            if ($activeService === 'openrouter' && $settingsService->get('use_genapi_service', false)) {
+                $activeService = 'genapi';
+            }
+
+            if ($activeService === 'genapi') {
                 return new GenApiService();
             } else {
-                return new PhotoComposeService();
+                return new \App\Services\OpenRouterService();
             }
         });
     }

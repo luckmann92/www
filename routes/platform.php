@@ -27,6 +27,7 @@ use App\Orchid\Screens\Settings\MainSettingsScreen;
 use App\Orchid\Screens\CollageEditScreen;
 use App\Orchid\Screens\CollagesScreen;
 use App\Orchid\Screens\MainScreen;
+use App\Orchid\Screens\SupportTicketsScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -141,7 +142,7 @@ Route::screen('settings/genapi', GenApiSettingsScreen::class)
     ->name('platform.settings.genapi')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.settings')
-        ->push('GenAPI Settings', route('platform.settings.genapi')));
+        ->push('Image Generation', route('platform.settings.genapi')));
 
 Route::screen('settings/payment', PaymentSettingsScreen::class)
     ->name('platform.settings.payment')
@@ -154,6 +155,13 @@ Route::screen('settings/telegram', TelegramSettingsScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.settings')
         ->push('Telegram Settings', route('platform.settings.telegram')));
+
+// Support Tickets Routes
+Route::screen('support-tickets', SupportTicketsScreen::class)
+    ->name('platform.support-tickets')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Support Tickets', route('platform.support-tickets')));
 
 // Collage Routes
 Route::screen('collages', CollagesScreen::class)
