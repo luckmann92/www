@@ -2,12 +2,13 @@
 
 namespace App\Orchid\Screens\Settings;
 
-use App\Services\SettingsService;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
+use Orchid\Support\Facades\Toast;
 
 class TelegramSettingsScreen extends Screen
 {
@@ -18,9 +19,15 @@ class TelegramSettingsScreen extends Screen
      */
     public function query(): array
     {
-        $settingsService = new SettingsService();
+        $settings = Setting::getByGroup('telegram');
+
+        // Если настройки еще не созданы, используем значения по умолчанию
+        if (empty($settings)) {
+            $settings = $this->getDefaultSettings();
+        }
+
         return [
-            'settings' => $settingsService->getAll(),
+            'settings' => $settings,
         ];
     }
 
@@ -41,7 +48,7 @@ class TelegramSettingsScreen extends Screen
      */
     public function description(): ?string
     {
-        return 'Настройки Telegram бота';
+        return 'Настройки интеграции с Telegram ботом';
     }
 
     /**
@@ -53,8 +60,8 @@ class TelegramSettingsScreen extends Screen
     {
         return [
             Button::make('Сохранить')
-                ->method('save')
-                ->icon('check'),
+                ->icon('check')
+                ->method('save'),
         ];
     }
 
@@ -67,12 +74,23 @@ class TelegramSettingsScreen extends Screen
     {
         return [
             Layout::rows([
+                Input::make('settings.telegram_bot_name')
+                    ->title('Название бота')
+                    ->placeholder('Введите название бота')
+                    ->help('Отображаемое название Telegram бота'),
+
+                Input::make('settings.telegram_bot_username')
+                    ->title('Username бота')
+                    ->placeholder('@your_bot')
+                    ->help('Username вашего Telegram бота (например, @MyPhotoBot)'),
+
                 Input::make('settings.telegram_bot_token')
-                    ->title('Telegram Bot Token')
+                    ->title('Bot Token')
                     ->placeholder('Введите токен бота')
                     ->type('password')
-                    ->help('Токен вашего Telegram бота'),
-            ]),
+                    ->help('API токен вашего Telegram бота')
+                    ->required(),
+            ])->title('Настройки Telegram бота'),
         ];
     }
 
@@ -84,18 +102,49 @@ class TelegramSettingsScreen extends Screen
      */
     public function save(Request $request)
     {
+        $request->validate([
+            'settings.telegram_bot_token' => 'required|string',
+        ]);
+
         $settings = $request->get('settings', []);
 
-        // Filter settings to only include the ones we want to save
-        $filteredSettings = [
-            'telegram_bot_token' => $settings['telegram_bot_token'] ?? null,
+        // Сохраняем настройки в БД с группой 'telegram'
+        $settingsToSave = [
+            'telegram_bot_name' => [
+                'value' => $settings['telegram_bot_name'] ?? '',
+                'group' => 'telegram',
+                'description' => 'Название Telegram бота'
+            ],
+            'telegram_bot_username' => [
+                'value' => $settings['telegram_bot_username'] ?? '',
+                'group' => 'telegram',
+                'description' => 'Username Telegram бота'
+            ],
+            'telegram_bot_token' => [
+                'value' => $settings['telegram_bot_token'] ?? '',
+                'group' => 'telegram',
+                'description' => 'API токен Telegram бота'
+            ],
         ];
 
-        $settingsService = new SettingsService();
-        $settingsService->set(array_merge($settingsService->getAll(), $filteredSettings));
+        Setting::setMultiple($settingsToSave);
 
-        $request->session()->flash('message', 'Настройки Telegram сохранены!');
+        Toast::info('Настройки Telegram успешно сохранены');
 
-        return redirect()->route('platform.main');
+        return redirect()->route('platform.settings.telegram');
+    }
+
+    /**
+     * Get default settings
+     *
+     * @return array
+     */
+    private function getDefaultSettings(): array
+    {
+        return [
+            'telegram_bot_name' => '',
+            'telegram_bot_username' => '',
+            'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+        ];
     }
 }

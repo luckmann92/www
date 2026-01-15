@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Photo;
+use App\Models\TelegramUser;
+use App\Models\SupportTicket;
+use App\Models\TicketMessage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -19,12 +23,9 @@ class TelegramBotController extends Controller
      */
     public function webhook(Request $request)
     {
-        // Verify the request is from Telegram (optional, depending on your security requirements)
-        // You can add bot token verification here if needed
-
         $update = $request->all();
 
-         // Log the received message
+        // Log the received message
         \Illuminate\Support\Facades\Log::info('Telegram Bot Message Received', $update);
 
         // Extract message information
@@ -35,15 +36,58 @@ class TelegramBotController extends Controller
 
         $chatId = $message['chat']['id'] ?? null;
         $text = $message['text'] ?? '';
-        $userId = $message['from']['id'] ?? null;
-        $userName = $message['from']['first_name'] ?? 'Unknown';
+        $from = $message['from'] ?? null;
 
-        if (!$chatId) {
-            return response()->json(['status' => 'no chat id']);
+        if (!$chatId || !$from) {
+            return response()->json(['status' => 'no chat id or user info']);
         }
 
+        // Сохраняем или обновляем пользователя Telegram
+        $telegramUser = TelegramUser::createOrUpdate($from);
 
-        // Check if the message is a command with code (e.g., /start ABC-DEF)
+        // Проверяем, ожидаем ли мы описание проблемы от этого пользователя
+        $awaitingSupportDescription = Cache::get("telegram_support_awaiting_{$chatId}");
+
+        // Обработка кнопки "Техническая поддержка"
+        if ($text === '🆘 Техническая поддержка') {
+            Cache::put("telegram_support_awaiting_{$chatId}", true, now()->addMinutes(30));
+            $this->sendMessage($chatId, "Пожалуйста, опишите вашу проблему. Я передам ваше обращение в службу поддержки.", false);
+            return response()->json(['status' => 'ok']);
+        }
+
+        // Если ожидаем описание проблемы
+        if ($awaitingSupportDescription) {
+            // Создаем обращение в поддержку
+            $ticket = SupportTicket::create([
+                'telegram_user_id' => $telegramUser->id,
+                'description' => $text,
+                'status' => SupportTicket::STATUS_NEW,
+            ]);
+
+            // Сохраняем первое сообщение в истории
+            $ticket->addUserMessage($text);
+
+            Cache::forget("telegram_support_awaiting_{$chatId}");
+            $this->sendMessage($chatId, "Ваше обращение #" . $ticket->id . " принято! Служба поддержки свяжется с вами в ближайшее время.", true);
+            return response()->json(['status' => 'ok']);
+        }
+
+        // Проверяем, есть ли у пользователя активные тикеты и это не команда
+        if (!Str::startsWith($text, '/') && !preg_match('/^\d{3}-\d{3}$/', $text)) {
+            $activeTicket = SupportTicket::where('telegram_user_id', $telegramUser->id)
+                ->whereIn('status', [SupportTicket::STATUS_NEW, SupportTicket::STATUS_IN_PROGRESS])
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($activeTicket) {
+                // Добавляем сообщение к активному тикету
+                $activeTicket->addUserMessage($text);
+                $this->sendMessage($chatId, "Ваше сообщение добавлено к обращению #{$activeTicket->id}. Ожидайте ответа от службы поддержки.", true);
+                return response()->json(['status' => 'ok']);
+            }
+        }
+
+        // Обработка команд и кодов
         $responseText = "Привет! Отправьте код в формате XXX-XXX, чтобы получить ваше фото.";
 
         if (Str::startsWith($text, '/start')) {
@@ -54,21 +98,21 @@ class TelegramBotController extends Controller
 
                 // Validate code format (XXX-XXX)
                 if (preg_match('/^\d{3}-\d{3}$/', $code)) {
-                    $responseText = $this->processCode($code, $chatId);
+                    $responseText = $this->processCode($code, $chatId, $telegramUser);
                 } else {
                     $responseText = "Неверный формат кода. Пожалуйста, введите код в формате XXX-XXX (например, 123-456).";
                 }
             } else {
                 // Send welcome message when /start is used without parameters
-                $responseText = "Привет! Я бот для отправки фото. Отправь номер, указанный на дисплее.";
+                $responseText = "Привет! Я бот для отправки фото. Отправьте код, указанный на дисплее.";
             }
         } elseif (preg_match('/^\d{3}-\d{3}$/', $text)) {
             // Direct code input (XXX-XXX)
-            $responseText = $this->processCode($text, $chatId);
+            $responseText = $this->processCode($text, $chatId, $telegramUser);
         }
 
-        // Send response back to Telegram
-        $this->sendMessage($chatId, $responseText);
+        // Send response back to Telegram with keyboard
+        $this->sendMessage($chatId, $responseText, true);
 
         return response()->json(['status' => 'ok']);
     }
@@ -80,7 +124,7 @@ class TelegramBotController extends Controller
      * @param int $chatId
      * @return string
      */
-    private function processCode(string $code, int $chatId): string
+    private function processCode(string $code, int $chatId, TelegramUser $telegramUser): string
     {
         // Find order by code
         $order = Order::where('code', $code)->first();
@@ -117,7 +161,7 @@ class TelegramBotController extends Controller
      * @param string $text
      * @return void
      */
-    private function sendMessage(int $chatId, string $text): void
+    private function sendMessage(int $chatId, string $text, bool $withKeyboard = true): void
     {
         $token = config('telegram.bot_token') ?: env('TELEGRAM_BOT_TOKEN');
         if (empty($token)) {
@@ -130,6 +174,19 @@ class TelegramBotController extends Controller
             'chat_id' => $chatId,
             'text' => $text,
         ];
+
+        // Добавляем клавиатуру с кнопкой поддержки
+        if ($withKeyboard) {
+            $data['reply_markup'] = json_encode([
+                'keyboard' => [
+                    [
+                        ['text' => '🆘 Техническая поддержка']
+                    ]
+                ],
+                'resize_keyboard' => true,
+                'one_time_keyboard' => false,
+            ]);
+        }
 
         // Send the message
         $this->sendToTelegram($url, $data);

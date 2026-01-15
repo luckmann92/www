@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 
 class SettingsService
@@ -15,7 +16,16 @@ class SettingsService
      */
     public function getAll(): array
     {
-        return Cache::get(self::CACHE_KEY, $this->getDefaultSettings());
+        // Пытаемся получить настройки из БД через модель Setting
+        $dbSettings = Setting::getAllCached();
+
+        // Если в БД нет настроек, используем значения по умолчанию из .env
+        if (empty($dbSettings)) {
+            return Cache::get(self::CACHE_KEY, $this->getDefaultSettings());
+        }
+
+        // Объединяем настройки из БД с настройками по умолчанию (БД имеет приоритет)
+        return array_merge($this->getDefaultSettings(), $dbSettings);
     }
 
     /**
@@ -27,12 +37,20 @@ class SettingsService
      */
     public function get(string $key, $default = null)
     {
+        // Сначала пробуем получить из БД
+        $value = Setting::get($key);
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        // Если нет в БД, проверяем кэш и настройки по умолчанию
         $settings = $this->getAll();
         return $settings[$key] ?? $default;
     }
 
     /**
-     * Set settings
+     * Set settings (для обратной совместимости, сохраняет в кэш)
      *
      * @param array $settings
      * @return void
@@ -46,6 +64,18 @@ class SettingsService
     }
 
     /**
+     * Set settings to database
+     *
+     * @param array $settings
+     * @param string $group
+     * @return void
+     */
+    public function setToDatabase(array $settings, string $group = 'general'): void
+    {
+        Setting::setMultiple($settings, $group);
+    }
+
+    /**
      * Get default settings
      *
      * @return array
@@ -54,9 +84,11 @@ class SettingsService
     {
         return [
             'openrouter_api_key' => env('OPENROUTER_API_KEY', ''),
+            'openrouter_endpoint' => env('OPENROUTER_ENDPOINT', 'https://openrouter.ai/api/v1/chat/completions'),
             'genapi_api_key' => env('GENAPI_API_KEY', ''),
             'genapi_endpoint' => env('GENAPI_ENDPOINT', 'https://api.gen-api.ru/api/v1/networks/gemini-flash-image'),
             'use_genapi_service' => env('USE_GENAPI_SERVICE', false),
+            'active_service' => env('USE_GENAPI_SERVICE', false) ? 'genapi' : 'openrouter',
             'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
             'payment_system' => env('PAYMENT_SYSTEM', 'custom'),
             'payment_provider_key' => env('PAYMENT_PROVIDER_KEY', ''),

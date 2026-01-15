@@ -39,7 +39,8 @@ class MainScreen extends Screen
             ->pluck('count', 'status');
 
         // Количество оплаченных заказов
-        $paidOrders = Order::where('status', 'paid')
+        $paidOrders = Order::whereBetween('paid_at', [$startDate, $endDate])
+            ->where('status', 'paid')
             ->count();
 
         // Общая сумма оплат
@@ -125,26 +126,10 @@ class MainScreen extends Screen
             $allValues[] = $revenueForDate ? (int)$revenueForDate->revenue : 0;
         }
 
-        // Убираем нули в начале и конце, чтобы график не начинался и не заканчивался нулями
-        $startIndex = 0;
-        $endIndex = count($allValues) - 1;
-
-        while ($startIndex < count($allValues) && $allValues[$startIndex] == 0) {
-            $startIndex++;
-        }
-
-        while ($endIndex >= $startIndex && $allValues[$endIndex] == 0) {
-            $endIndex--;
-        }
-
-        if ($startIndex <= $endIndex) {
-            $revenueDates = array_slice($allDates, $startIndex, $endIndex - $startIndex + 1);
-            $revenueValues = array_slice($allValues, $startIndex, $endIndex - $startIndex + 1);
-        } else {
-            // Если все значения нули, оставляем хотя бы один элемент для отображения оси
-            $revenueDates = $allDates;
-            $revenueValues = $allValues;
-        }
+        // Оставляем все даты и значения, чтобы график всегда имел полную ось X
+        // Это обеспечит корректное отображение даже если часть значений равна 0
+        $revenueDates = $allDates;
+        $revenueValues = $allValues;
 
         $revenueData = [
             [
