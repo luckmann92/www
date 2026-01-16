@@ -78,6 +78,10 @@ class OrdersScreen extends Screen
                 TD::make('blurred_image', 'Размытое')
                     ->width('100px')
                     ->render(function (Order $order) {
+                        if (!$order->session || !$order->session->photos) {
+                            return '-';
+                        }
+
                         $blurredPhoto = $order->session->photos
                             ->where('type', 'result')
                             ->where('blur_level', 80)
@@ -95,6 +99,10 @@ class OrdersScreen extends Screen
                 TD::make('ready_image', 'Готовое')
                     ->width('100px')
                     ->render(function (Order $order) {
+                        if (!$order->session || !$order->session->photos) {
+                            return '-';
+                        }
+
                         $readyPhoto = $order->session->photos
                             ->where('type', 'result')
                             ->where('blur_level', 0)
