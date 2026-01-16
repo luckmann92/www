@@ -26,6 +26,11 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
     protected string $apiKey;
 
     /**
+     * @var string OpenRouter model
+     */
+    protected string $model;
+
+    /**
      * @var ImageManager
      */
     protected ImageManager $imageManager;
@@ -36,12 +41,14 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
      * Reads configuration from services config:
      *   services.openrouter.endpoint – base URL of the API
      *   services.openrouter.api_key   – secret key
+     *   services.openrouter.model     – model to use
      */
     public function __construct()
     {
         $settingsService = new \App\Services\SettingsService();
         $this->endpoint = rtrim($settingsService->get('openrouter_endpoint', 'https://openrouter.ai/api/v1/chat/completions'), '/');
         $this->apiKey = $settingsService->get('openrouter_api_key', '');
+        $this->model = $settingsService->get('openrouter_model', 'google/gemini-2.5-flash-image');
 
         // Initialize ImageManager with GD driver
         $this->imageManager = new ImageManager(new GdDriver());
@@ -106,14 +113,13 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
 
         // Build request payload
         $payload = [
-            'model' => 'google/gemini-2.5-flash-image-preview',
+            'model' => $this->model,
             'messages' => [
                 [
                     'role' => 'user',
                     'content' => $content
                 ]
-            ],
-            'modalities' => ['image', 'text']
+            ]
         ];
 
         // Send request to OpenRouter
@@ -123,7 +129,7 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
         ]);
 
         Log::info('OpenRouter Request', [
-            'model' => 'google/gemini-2.5-flash-image-preview',
+            'model' => $this->model,
             'prompt' => $prompt,
             'original_image' => 'base64 encoded',
             'additional_images_count' => count($imageUrls),

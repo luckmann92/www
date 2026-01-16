@@ -119,6 +119,11 @@ class GenApiSettingsScreen extends Screen
                     ->type('password')
                     ->placeholder('Введите API ключ OpenRouter')
                     ->help('Секретный ключ для доступа к OpenRouter'),
+
+                Input::make('settings.openrouter_model')
+                    ->title('Модель')
+                    ->placeholder('google/gemini-2.5-flash-image')
+                    ->help('Модель для генерации изображений (например: google/gemini-2.5-flash-image)'),
             ])->title('Настройки OpenRouter'),
         ];
     }
@@ -174,6 +179,11 @@ class GenApiSettingsScreen extends Screen
                 'group' => 'image_generation',
                 'description' => 'API ключ для OpenRouter'
             ],
+            'openrouter_model' => [
+                'value' => $settings['openrouter_model'] ?? 'google/gemini-2.5-flash-image',
+                'group' => 'image_generation',
+                'description' => 'Модель для генерации изображений OpenRouter'
+            ],
         ];
 
         Setting::setMultiple($settingsToSave);
@@ -198,6 +208,7 @@ class GenApiSettingsScreen extends Screen
             'openrouter_name' => 'OpenRouter',
             'openrouter_endpoint' => env('OPENROUTER_ENDPOINT', 'https://openrouter.ai/api/v1/chat/completions'),
             'openrouter_api_key' => env('OPENROUTER_API_KEY', ''),
+            'openrouter_model' => env('OPENROUTER_MODEL', 'google/gemini-2.5-flash-image'),
         ];
     }
 }
