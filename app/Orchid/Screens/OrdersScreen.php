@@ -4,9 +4,8 @@ namespace App\Orchid\Screens;
 
 use App\Models\Order;
 use Orchid\Screen\Screen;
-use Orchid\Screen\Actions\Button;
-use Orchid\Screen\Layout;
-use Orchid\Support\Facades\Layout as LayoutComponent;
+use Orchid\Screen\TD;
+use Orchid\Support\Facades\Layout;
 
 class OrdersScreen extends Screen
 {
@@ -18,7 +17,9 @@ class OrdersScreen extends Screen
     public function query(): array
     {
         return [
-            'orders' => Order::with(['session', 'collage'])->paginate(10),
+            'orders' => Order::with(['session', 'collage', 'payment'])
+                ->orderBy('created_at', 'desc')
+                ->paginate(50),
         ];
     }
 
@@ -60,17 +61,36 @@ class OrdersScreen extends Screen
     public function layout(): array
     {
         return [
-            LayoutComponent::table('orders', [
-                'id',
-                'session_id',
-                'collage.title',
-                'price',
-                'status',
-                'created_at',
-                'actions' => Button::make('Просмотр')
-                    ->icon('eye')
-                    ->method('view')
-                    ->canSee(true),
+            Layout::table('orders', [
+                TD::make('id', 'ID')
+                    ->width('50px'),
+
+                TD::make('code', 'Код')
+                    ->render(fn (Order $order) => $order->code ?? '-'),
+
+                TD::make('session_id', 'Сессия')
+                    ->render(fn (Order $order) => "#{$order->session_id}"),
+
+                TD::make('collage', 'Коллаж')
+                    ->render(fn (Order $order) => $order->collage->title ?? '-'),
+
+                TD::make('price', 'Цена')
+                    ->render(fn (Order $order) => $order->price . ' ₽'),
+
+                TD::make('status', 'Статус')
+                    ->render(function (Order $order) {
+                        $statusNames = [
+                            'pending' => 'Ожидает',
+                            'paid' => 'Оплачен',
+                            'ready_blurred' => 'Готов (размыт)',
+                            'delivered' => 'Доставлен',
+                            'failed' => 'Ошибка',
+                        ];
+                        return $statusNames[$order->status] ?? $order->status;
+                    }),
+
+                TD::make('created_at', 'Создан')
+                    ->render(fn (Order $order) => $order->created_at->format('d.m.Y H:i')),
             ]),
         ];
     }

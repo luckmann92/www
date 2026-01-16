@@ -6,6 +6,7 @@ use App\Models\SupportTicket;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
@@ -73,7 +74,10 @@ class SupportTicketsScreen extends Screen
             Layout::table('tickets', [
                 TD::make('id', 'ID')
                     ->width('50px')
-                    ->render(fn (SupportTicket $ticket) => $ticket->id),
+                    ->render(fn (SupportTicket $ticket) =>
+                        Link::make((string)$ticket->id)
+                            ->route('platform.support-ticket.view', $ticket->id)
+                    ),
 
                 TD::make('status', 'Статус')
                     ->width('120px')

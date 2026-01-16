@@ -26,8 +26,12 @@ use App\Orchid\Screens\Settings\TelegramSettingsScreen;
 use App\Orchid\Screens\Settings\MainSettingsScreen;
 use App\Orchid\Screens\CollageEditScreen;
 use App\Orchid\Screens\CollagesScreen;
+use App\Orchid\Screens\DeliveriesScreen;
 use App\Orchid\Screens\MainScreen;
+use App\Orchid\Screens\OrdersScreen;
 use App\Orchid\Screens\SupportTicketsScreen;
+use App\Orchid\Screens\SupportTicketViewScreen;
+use App\Orchid\Screens\TelegramUsersScreen;
 use Illuminate\Support\Facades\Route;
 use Tabuna\Breadcrumbs\Trail;
 
@@ -162,6 +166,33 @@ Route::screen('support-tickets', SupportTicketsScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
         ->push('Support Tickets', route('platform.support-tickets')));
+
+Route::screen('support-tickets/{ticket}', SupportTicketViewScreen::class)
+    ->name('platform.support-ticket.view')
+    ->breadcrumbs(fn (Trail $trail, $ticket) => $trail
+        ->parent('platform.support-tickets')
+        ->push('Обращение #' . $ticket->id, route('platform.support-ticket.view', $ticket)));
+
+// Telegram Users Routes
+Route::screen('telegram-users', TelegramUsersScreen::class)
+    ->name('platform.telegram-users')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Telegram Users', route('platform.telegram-users')));
+
+// Orders Routes
+Route::screen('orders', OrdersScreen::class)
+    ->name('platform.orders')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Orders', route('platform.orders')));
+
+// Deliveries Routes
+Route::screen('deliveries', DeliveriesScreen::class)
+    ->name('platform.deliveries')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Deliveries', route('platform.deliveries')));
 
 // Collage Routes
 Route::screen('collages', CollagesScreen::class)

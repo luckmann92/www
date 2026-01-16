@@ -42,6 +42,23 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.image')
                 ->route('platform.collages')
                 ->title('Контент'),
+
+            Menu::make('Техническая поддержка')
+                ->icon('bs.chat-dots')
+                ->route('platform.support-tickets')
+                ->badge(fn () => \App\Models\SupportTicket::where('status', 'new')->count(), Color::DANGER),
+
+            Menu::make('Telegram пользователи')
+                ->icon('bs.people')
+                ->route('platform.telegram-users'),
+
+            Menu::make('Заказы')
+                ->icon('bs.cart')
+                ->route('platform.orders'),
+
+            Menu::make('Доставки')
+                ->icon('bs.box-seam')
+                ->route('platform.deliveries'),
             /*Menu::make('Sample Screen')
                 ->icon('bs.collection')
                 ->route('platform.example')

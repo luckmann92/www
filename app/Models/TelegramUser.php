@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Orchid\Screen\AsSource;
 
 class TelegramUser extends Model
 {
+    use AsSource;
     /**
      * The attributes that are mass assignable.
      *
