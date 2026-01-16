@@ -52,22 +52,12 @@ class TelegramBotController extends Controller
         // Проверяем, является ли пользователь оператором поддержки
         $isSupport = $this->isSupportOperator($username);
 
-        // Обработка ответа оператора на тикет (reply на сообщение)
-        if ($isSupport && $replyToMessage) {
-            $replyText = $replyToMessage['text'] ?? '';
-            // Ищем номер тикета в сообщении, на которое отвечают
-            if (preg_match('/Тикет #(\d+)/u', $replyText, $matches)) {
-                $ticketId = (int) $matches[1];
-                return $this->handleOperatorReply($ticketId, $text, $telegramUser, $chatId);
-            }
+        // ===== ОБРАБОТКА ЗАПРОСОВ ОПЕРАТОРА =====
+        if ($isSupport) {
+            return $this->handleOperatorRequest($chatId, $text, $telegramUser, $replyToMessage);
         }
 
-        // Обработка команды ответа оператора: /reply_123 текст ответа
-        if ($isSupport && preg_match('/^\/reply_(\d+)\s+(.+)$/su', $text, $matches)) {
-            $ticketId = (int) $matches[1];
-            $replyText = $matches[2];
-            return $this->handleOperatorReply($ticketId, $replyText, $telegramUser, $chatId);
-        }
+        // ===== ОБРАБОТКА ЗАПРОСОВ ОБЫЧНОГО ПОЛЬЗОВАТЕЛЯ =====
 
         // Проверяем, ожидаем ли мы описание проблемы от этого пользователя
         $awaitingSupportDescription = Cache::get("telegram_support_awaiting_{$chatId}");
@@ -435,6 +425,267 @@ class TelegramBotController extends Controller
             'chat_id' => $chatId,
             'text' => $text,
             'parse_mode' => 'HTML',
+        ];
+
+        $this->sendToTelegram($url, $data);
+    }
+
+    /**
+     * Handle all operator requests
+     *
+     * @param int $chatId
+     * @param string $text
+     * @param TelegramUser $operator
+     * @param array|null $replyToMessage
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function handleOperatorRequest(int $chatId, string $text, TelegramUser $operator, ?array $replyToMessage)
+    {
+        // Обработка ответа оператора через reply на сообщение
+        if ($replyToMessage) {
+            $replyText = $replyToMessage['text'] ?? '';
+            if (preg_match('/Тикет #(\d+)/u', $replyText, $matches)) {
+                $ticketId = (int) $matches[1];
+                return $this->handleOperatorReply($ticketId, $text, $operator, $chatId);
+            }
+        }
+
+        // /start - показать приветствие и список тикетов
+        if ($text === '/start' || Str::startsWith($text, '/start ')) {
+            return $this->showOperatorWelcome($chatId);
+        }
+
+        // /tickets - показать список открытых тикетов
+        if ($text === '/tickets' || $text === '📋 Открытые тикеты') {
+            return $this->showOpenTickets($chatId);
+        }
+
+        // /ticket_N - показать детали тикета
+        if (preg_match('/^\/ticket_(\d+)$/u', $text, $matches)) {
+            $ticketId = (int) $matches[1];
+            return $this->showTicketDetails($ticketId, $chatId);
+        }
+
+        // /reply_N текст - ответить на тикет
+        if (preg_match('/^\/reply_(\d+)\s+(.+)$/su', $text, $matches)) {
+            $ticketId = (int) $matches[1];
+            $replyText = $matches[2];
+            return $this->handleOperatorReply($ticketId, $replyText, $operator, $chatId);
+        }
+
+        // /close_N - закрыть тикет
+        if (preg_match('/^\/close_(\d+)$/u', $text, $matches)) {
+            $ticketId = (int) $matches[1];
+            return $this->closeTicket($ticketId, $chatId);
+        }
+
+        // По умолчанию показываем справку
+        $this->showOperatorHelp($chatId);
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Show operator welcome message with open tickets
+     *
+     * @param int $chatId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function showOperatorWelcome(int $chatId)
+    {
+        $message = "👨‍💼 Панель оператора поддержки\n\n";
+        $message .= "Доступные команды:\n";
+        $message .= "/tickets - Список открытых тикетов\n";
+        $message .= "/ticket_N - Просмотр тикета N\n";
+        $message .= "/reply_N текст - Ответить на тикет N\n";
+        $message .= "/close_N - Закрыть тикет N\n\n";
+        $message .= "Также можно ответить на уведомление о тикете (reply).\n";
+
+        $this->sendOperatorMessage($chatId, $message);
+
+        // Сразу показываем открытые тикеты
+        return $this->showOpenTickets($chatId);
+    }
+
+    /**
+     * Show help for operator
+     *
+     * @param int $chatId
+     * @return void
+     */
+    private function showOperatorHelp(int $chatId): void
+    {
+        $message = "👨‍💼 Панель оператора поддержки\n\n";
+        $message .= "Доступные команды:\n";
+        $message .= "/tickets - Список открытых тикетов\n";
+        $message .= "/ticket_N - Просмотр тикета N\n";
+        $message .= "/reply_N текст - Ответить на тикет N\n";
+        $message .= "/close_N - Закрыть тикет N\n\n";
+        $message .= "Также можно ответить на уведомление о тикете (reply).";
+
+        $this->sendOperatorMessage($chatId, $message);
+    }
+
+    /**
+     * Show list of open tickets to operator
+     *
+     * @param int $chatId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function showOpenTickets(int $chatId)
+    {
+        $tickets = SupportTicket::with('telegramUser')
+            ->whereIn('status', [SupportTicket::STATUS_NEW, SupportTicket::STATUS_IN_PROGRESS])
+            ->orderByRaw("CASE WHEN status = 'new' THEN 1 ELSE 2 END")
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        if ($tickets->isEmpty()) {
+            $this->sendOperatorMessage($chatId, "✅ Нет открытых тикетов!");
+            return response()->json(['status' => 'ok']);
+        }
+
+        $message = "📋 Открытые тикеты ({$tickets->count()}):\n\n";
+
+        foreach ($tickets as $ticket) {
+            $statusIcon = $ticket->status === SupportTicket::STATUS_NEW ? '🆕' : '🔄';
+            $userName = $ticket->telegramUser->full_name ?? 'Неизвестен';
+            $description = Str::limit($ticket->description, 50);
+
+            $message .= "{$statusIcon} Тикет #{$ticket->id}\n";
+            $message .= "👤 {$userName}\n";
+            $message .= "📝 {$description}\n";
+            $message .= "📅 {$ticket->created_at->format('d.m.Y H:i')}\n";
+            $message .= "➡️ /ticket_{$ticket->id}\n\n";
+        }
+
+        $this->sendOperatorMessage($chatId, $message);
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Show ticket details to operator
+     *
+     * @param int $ticketId
+     * @param int $chatId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function showTicketDetails(int $ticketId, int $chatId)
+    {
+        $ticket = SupportTicket::with(['telegramUser', 'messages'])->find($ticketId);
+
+        if (!$ticket) {
+            $this->sendOperatorMessage($chatId, "❌ Тикет #{$ticketId} не найден.");
+            return response()->json(['status' => 'ok']);
+        }
+
+        $statusNames = [
+            'new' => '🆕 Новый',
+            'in_progress' => '🔄 В работе',
+            'closed' => '✅ Закрыт',
+        ];
+
+        $message = "📋 Тикет #{$ticket->id}\n\n";
+        $message .= "Статус: {$statusNames[$ticket->status]}\n";
+        $message .= "👤 Пользователь: {$ticket->telegramUser->full_name}";
+        if ($ticket->telegramUser->username) {
+            $message .= " (@{$ticket->telegramUser->username})";
+        }
+        $message .= "\n";
+        $message .= "📅 Создан: {$ticket->created_at->format('d.m.Y H:i')}\n\n";
+        $message .= "📝 Описание:\n{$ticket->description}\n\n";
+
+        // История сообщений
+        if ($ticket->messages->count() > 0) {
+            $message .= "💬 История сообщений:\n";
+            $message .= "─────────────────\n";
+            foreach ($ticket->messages->take(10) as $msg) {
+                $sender = $msg->isFromUser() ? '👤' : '👨‍💼';
+                $time = $msg->created_at->format('d.m H:i');
+                $msgText = Str::limit($msg->message, 100);
+                $message .= "{$sender} [{$time}]: {$msgText}\n";
+            }
+            $message .= "─────────────────\n\n";
+        }
+
+        if ($ticket->status !== SupportTicket::STATUS_CLOSED) {
+            $message .= "💡 Действия:\n";
+            $message .= "/reply_{$ticket->id} текст - Ответить\n";
+            $message .= "/close_{$ticket->id} - Закрыть тикет\n";
+        }
+
+        $this->sendOperatorMessage($chatId, $message);
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Close ticket
+     *
+     * @param int $ticketId
+     * @param int $chatId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function closeTicket(int $ticketId, int $chatId)
+    {
+        $ticket = SupportTicket::with('telegramUser')->find($ticketId);
+
+        if (!$ticket) {
+            $this->sendOperatorMessage($chatId, "❌ Тикет #{$ticketId} не найден.");
+            return response()->json(['status' => 'ok']);
+        }
+
+        if ($ticket->status === SupportTicket::STATUS_CLOSED) {
+            $this->sendOperatorMessage($chatId, "❌ Тикет #{$ticketId} уже закрыт.");
+            return response()->json(['status' => 'ok']);
+        }
+
+        $ticket->close();
+
+        // Notify user
+        if ($ticket->telegramUser) {
+            $userMessage = "✅ Ваше обращение #{$ticket->id} закрыто.\n\nЕсли у вас есть другие вопросы, нажмите кнопку \"🆘 Техническая поддержка\".";
+            $this->sendMessage($ticket->telegramUser->telegram_id, $userMessage, true);
+        }
+
+        $this->sendOperatorMessage($chatId, "✅ Тикет #{$ticket->id} закрыт.");
+
+        Log::info('Support ticket closed by operator', [
+            'ticket_id' => $ticket->id,
+            'operator_chat_id' => $chatId,
+        ]);
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Send message to operator with operator keyboard
+     *
+     * @param int $chatId
+     * @param string $text
+     * @return void
+     */
+    private function sendOperatorMessage(int $chatId, string $text): void
+    {
+        $token = Setting::get('telegram_bot_token', env('TELEGRAM_BOT_TOKEN'));
+        if (empty($token)) {
+            Log::error('Telegram bot token is not configured');
+            return;
+        }
+
+        $url = "https://api.telegram.org/bot{$token}/sendMessage";
+
+        $data = [
+            'chat_id' => $chatId,
+            'text' => $text,
+            'reply_markup' => json_encode([
+                'keyboard' => [
+                    [
+                        ['text' => '📋 Открытые тикеты']
+                    ]
+                ],
+                'resize_keyboard' => true,
+                'one_time_keyboard' => false,
+            ]),
         ];
 
         $this->sendToTelegram($url, $data);
