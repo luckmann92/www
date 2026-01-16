@@ -8,8 +8,10 @@ use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
+use Orchid\Screen\Components\Cells\DateTimeSplit;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
+use Orchid\Screen\Layouts\Persona;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Color;
@@ -108,33 +110,34 @@ class SupportTicketsScreen extends Screen
                     ->width('200px')
                     ->align(TD::ALIGN_RIGHT)
                     ->render(function (SupportTicket $ticket) {
-                        $actions = [];
+                        $html = '<div class="d-flex gap-1 justify-content-end">';
 
                         if ($ticket->status === SupportTicket::STATUS_NEW) {
-                            $actions[] = ModalToggle::make('Взять в работу')
+                            $html .= ModalToggle::make('В работу')
                                 ->modal('takeTicket')
                                 ->modalTitle('Взять обращение в работу')
                                 ->method('takeInProgress')
                                 ->asyncParameters([
                                     'ticket' => $ticket->id,
                                 ])
-                                ->icon('pencil')
-                                ->type(Color::WARNING);
+                                ->icon('bs.pencil')
+                                ->class('btn btn-sm btn-warning');
                         }
 
                         if ($ticket->status !== SupportTicket::STATUS_CLOSED) {
-                            $actions[] = ModalToggle::make('Закрыть')
+                            $html .= ModalToggle::make('Закрыть')
                                 ->modal('closeTicket')
                                 ->modalTitle('Закрыть обращение')
                                 ->method('close')
                                 ->asyncParameters([
                                     'ticket' => $ticket->id,
                                 ])
-                                ->icon('check')
-                                ->type(Color::SUCCESS);
+                                ->icon('bs.check')
+                                ->class('btn btn-sm btn-success');
                         }
 
-                        return Layout::rows($actions);
+                        $html .= '</div>';
+                        return $html;
                     }),
             ]),
 
