@@ -97,24 +97,15 @@ class GenApiService implements \App\Services\PhotoComposeInterface
             'translate_input' => true,
         ];
 
-        /*$response = $client->post(
-            $endpoint,
-            [
-                'json' => $data,
-                'headers' => $headers
-            ]
-        );
-        $response = json_decode($response->getBody()->getContents(), true);
-        */
-
-        $response = [
+        /* /*$response = [
             "request_id" => 36063973,
             "cost" => 9.75,
             "model" => "gemini-flash-image",
             "images" => [
                 0 => "https://vm-8d3a6ab3.na4u.ru/tmp/1767609489_695b9491630c4.jpg"
             ]
-        ];
+        ];*/
+
 
         Log::info('GenAPI Request', [
             'network_id' => 'gemini-flash-image',
