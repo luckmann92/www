@@ -6,6 +6,7 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\TextArea;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
@@ -91,6 +92,14 @@ class TelegramSettingsScreen extends Screen
                     ->help('API токен вашего Telegram бота')
                     ->required(),
             ])->title('Настройки Telegram бота'),
+
+            Layout::rows([
+                TextArea::make('settings.telegram_support_users')
+                    ->title('Операторы техподдержки')
+                    ->placeholder("@username1\n@username2\n@username3")
+                    ->rows(5)
+                    ->help('Укажите username операторов техподдержки (по одному на строку). Этим пользователям будут пересылаться обращения в поддержку и они смогут отвечать на них через Telegram.'),
+            ])->title('Техническая поддержка'),
         ];
     }
 
@@ -125,6 +134,11 @@ class TelegramSettingsScreen extends Screen
                 'group' => 'telegram',
                 'description' => 'API токен Telegram бота'
             ],
+            'telegram_support_users' => [
+                'value' => $settings['telegram_support_users'] ?? '',
+                'group' => 'telegram',
+                'description' => 'Username операторов техподдержки (по одному на строку)'
+            ],
         ];
 
         Setting::setMultiple($settingsToSave);
@@ -145,6 +159,7 @@ class TelegramSettingsScreen extends Screen
             'telegram_bot_name' => '',
             'telegram_bot_username' => '',
             'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+            'telegram_support_users' => '',
         ];
     }
 }
