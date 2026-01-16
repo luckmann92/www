@@ -63,31 +63,33 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
      */
     public function generate(string $originalPath, string $prompt, array $imageUrls = []): array
     {
-        // 1. Prepare the original image for sending
+        // 1. Prepare the original image as base64
         $originalData = Storage::disk('local')->get($originalPath);
 
-        // 2. Create temporary file for upload
-        $tempPath = "temp/" . Str::uuid() . '.jpg';
-        Storage::disk('local')->put($tempPath, $originalData);
+        // Determine MIME type from file contents
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->buffer($originalData);
+        if (!$mimeType || strpos($mimeType, 'image/') !== 0) {
+            $mimeType = 'image/jpeg'; // fallback to jpeg
+        }
 
-        // 3. Get the public URL for the temporary file
-        $publicTempPath = 'temp/' . basename($tempPath);
-        Storage::disk('public')->put($publicTempPath, $originalData);
-        $originalImageUrl = url('storage/' . $publicTempPath);
+        // Convert original image to base64 data URL
+        $base64Original = base64_encode($originalData);
+        $dataUrl = "data:{$mimeType};base64,{$base64Original}";
 
-        // 4. Combine original image URL with additional image URLs from collage
-        $allImageUrls = array_merge([$originalImageUrl], $imageUrls);
+        // 2. Build content array with images FIRST, then text (as per OpenRouter API)
+        $content = [];
 
-        // 5. Build content array with all images
-        $content = [
-            [
-                'type' => 'text',
-                'text' => $prompt
+        // Add original person photo first (as base64)
+        $content[] = [
+            'type' => 'image_url',
+            'image_url' => [
+                'url' => $dataUrl
             ]
         ];
 
-        // Add all images to content
-        foreach ($allImageUrls as $imgUrl) {
+        // Add additional images from collage (images_for_generation) as URLs
+        foreach ($imageUrls as $imgUrl) {
             $content[] = [
                 'type' => 'image_url',
                 'image_url' => [
@@ -96,7 +98,13 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
             ];
         }
 
-        // 6. Build request payload
+        // Add prompt text LAST
+        $content[] = [
+            'type' => 'text',
+            'text' => $prompt
+        ];
+
+        // Build request payload
         $payload = [
             'model' => 'google/gemini-2.5-flash-image-preview',
             'messages' => [
@@ -108,7 +116,7 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
             'modalities' => ['image', 'text']
         ];
 
-        // 7. Send request to OpenRouter
+        // Send request to OpenRouter
         $client = new Client([
             'timeout' => 120,
             'verify' => false // Отключаем проверку SSL-сертификата
@@ -117,7 +125,8 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
         Log::info('OpenRouter Request', [
             'model' => 'google/gemini-2.5-flash-image-preview',
             'prompt' => $prompt,
-            'image_urls_count' => count($allImageUrls),
+            'original_image' => 'base64 encoded',
+            'additional_images_count' => count($imageUrls),
         ]);
 
         try {
@@ -159,11 +168,7 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
             throw new \Exception($errorMessage);
         }
 
-        // 8. Clean up temporary file
-        Storage::disk('local')->delete($tempPath);
-        Storage::disk('public')->delete($publicTempPath);
-
-        // 9. Handle response
+        // 3. Handle response
         if (!isset($body['choices']) || !is_array($body['choices']) || empty($body['choices'])) {
             throw new \Exception('Invalid response from OpenRouter service.');
         }
@@ -200,12 +205,12 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
             throw new \Exception('Failed to retrieve generated image from OpenRouter response.');
         }
 
-        // 10. Store the generated image in public storage
+        // 4. Store the generated image in public storage
         $generatedFilename = Str::uuid() . '.jpg';
         $generatedPath = "photos/results/{$generatedFilename}";
         Storage::disk('public')->put($generatedPath, $imageData);
 
-        // 11. Create blurred version using temporary file (like GenApiService)
+        // 5. Create blurred version using temporary file
         $tempPath = storage_path('app/temp/' . Str::uuid() . '.jpg');
         // Создаем директорию, если она не существует
         $tempDir = dirname($tempPath);
@@ -226,7 +231,7 @@ class OpenRouterService implements \App\Services\PhotoComposeInterface
         $blurredPath = "photos/results/{$blurredFilename}";
         Storage::disk('public')->put($blurredPath, $blurredData);
 
-        // 12. Return storage paths
+        // 6. Return storage paths
         return [
             'image_path' => $generatedPath,
             'blurred_path' => $blurredPath,
