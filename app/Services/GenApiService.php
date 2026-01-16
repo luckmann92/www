@@ -97,26 +97,39 @@ class GenApiService implements \App\Services\PhotoComposeInterface
             'translate_input' => true,
         ];
 
-        /* /*$response = [
-            "request_id" => 36063973,
-            "cost" => 9.75,
-            "model" => "gemini-flash-image",
-            "images" => [
-                0 => "https://vm-8d3a6ab3.na4u.ru/tmp/1767609489_695b9491630c4.jpg"
-            ]
-        ];*/
-
-
         Log::info('GenAPI Request', [
             'network_id' => 'gemini-flash-image',
             'prompt' => $prompt,
             'image_urls_count' => count($allImageUrls),
         ]);
 
-        Log::info('GenAPI Response', [
-            'request_id' => $response['request_id'] ?? null,
-            'cost' => $response['cost'] ?? null,
-        ]);
+        try {
+            $httpResponse = $client->post($endpoint, [
+                'headers' => $headers,
+                'json' => $data
+            ]);
+
+            $response = json_decode($httpResponse->getBody()->getContents(), true);
+
+            Log::info('GenAPI Response', [
+                'request_id' => $response['request_id'] ?? null,
+                'cost' => $response['cost'] ?? null,
+            ]);
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $responseBody = $e->getResponse()->getBody()->getContents();
+            $errorMessage = "Client error: {$e->getMessage()}. Response: {$responseBody}";
+            Log::error('GenAPI Client Error', ['error' => $errorMessage]);
+            throw new \Exception($errorMessage);
+        } catch (\GuzzleHttp\Exception\ServerException $e) {
+            $responseBody = $e->getResponse()->getBody()->getContents();
+            $errorMessage = "Server error: {$e->getMessage()}. Response: {$responseBody}";
+            Log::error('GenAPI Server Error', ['error' => $errorMessage]);
+            throw new \Exception($errorMessage);
+        } catch (\Exception $e) {
+            $errorMessage = "Error communicating with GenAPI service: " . $e->getMessage();
+            Log::error('GenAPI Error', ['error' => $errorMessage]);
+            throw new \Exception($errorMessage);
+        }
 
         Storage::disk('local')->delete($tempPath);
         Storage::disk('public')->delete($publicTempPath);

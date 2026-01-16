@@ -15,15 +15,11 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Bind PhotoComposeInterface to the container
-        $this->app->singleton(PhotoComposeInterface::class, function ($app) {
+        // Use bind instead of singleton to ensure settings are read fresh on each request
+        $this->app->bind(PhotoComposeInterface::class, function ($app) {
             // Check settings to determine which service to use
             $settingsService = new \App\Services\SettingsService();
             $activeService = $settingsService->get('active_service', 'openrouter');
-
-            // Для обратной совместимости проверяем старую настройку
-            if ($activeService === 'openrouter' && $settingsService->get('use_genapi_service', false)) {
-                $activeService = 'genapi';
-            }
 
             if ($activeService === 'genapi') {
                 return new GenApiService();
