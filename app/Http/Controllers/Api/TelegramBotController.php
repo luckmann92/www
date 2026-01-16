@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Delivery;
 use App\Models\Order;
 use App\Models\Photo;
 use App\Models\Setting;
@@ -172,6 +173,31 @@ class TelegramBotController extends Controller
 
         // Send photo to user
         $this->sendPhoto($chatId, $resultPhoto->path);
+
+        // Create or update delivery record
+        $delivery = Delivery::updateOrCreate(
+            ['order_id' => $order->id, 'channel' => 'telegram'],
+            [
+                'telegram_user_id' => $telegramUser->id,
+                'status' => 'delivered',
+                'meta' => [
+                    'chat_id' => $chatId,
+                    'file_path' => $resultPhoto->path,
+                    'delivered_at' => now()->toDateTimeString(),
+                ],
+            ]
+        );
+
+        // Update order status to delivered
+        $order->status = 'delivered';
+        $order->save();
+
+        Log::info('Photo delivered via Telegram', [
+            'order_id' => $order->id,
+            'delivery_id' => $delivery->id,
+            'telegram_user_id' => $telegramUser->id,
+            'chat_id' => $chatId,
+        ]);
 
         return "Вот ваше фото по заказу {$code}!";
     }

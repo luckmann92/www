@@ -29,6 +29,7 @@ use App\Orchid\Screens\CollagesScreen;
 use App\Orchid\Screens\DeliveriesScreen;
 use App\Orchid\Screens\MainScreen;
 use App\Orchid\Screens\OrdersScreen;
+use App\Orchid\Screens\OrderViewScreen;
 use App\Orchid\Screens\SupportTicketsScreen;
 use App\Orchid\Screens\SupportTicketViewScreen;
 use App\Orchid\Screens\TelegramUsersScreen;
@@ -185,7 +186,13 @@ Route::screen('orders', OrdersScreen::class)
     ->name('platform.orders')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push('Orders', route('platform.orders')));
+        ->push('Заказы', route('platform.orders')));
+
+Route::screen('orders/{order}', OrderViewScreen::class)
+    ->name('platform.order.view')
+    ->breadcrumbs(fn (Trail $trail, $order) => $trail
+        ->parent('platform.orders')
+        ->push('Заказ #' . ($order->code ?? $order->id), route('platform.order.view', $order)));
 
 // Deliveries Routes
 Route::screen('deliveries', DeliveriesScreen::class)

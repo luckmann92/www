@@ -4,6 +4,7 @@ namespace App\Orchid\Screens;
 
 use App\Models\Order;
 use App\Models\Photo;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
@@ -18,7 +19,7 @@ class OrdersScreen extends Screen
     public function query(): array
     {
         return [
-            'orders' => Order::with(['session.photos', 'collage', 'payment'])
+            'orders' => Order::with(['collage', 'delivery.telegramUser'])
                 ->orderBy('created_at', 'desc')
                 ->paginate(50),
         ];
@@ -63,85 +64,69 @@ class OrdersScreen extends Screen
     {
         return [
             Layout::table('orders', [
-                TD::make('id', 'ID')
-                    ->width('50px'),
+                TD::make('code', 'Номер заказа')
+                    ->render(function (Order $order) {
+                        return Link::make($order->code ?? "#{$order->id}")
+                            ->route('platform.order.view', $order);
+                    }),
 
-                TD::make('code', 'Код')
-                    ->render(fn (Order $order) => $order->code ?? '-'),
+                TD::make('status', 'Статус')
+                    ->render(function (Order $order) {
+                        $statusClasses = [
+                            'pending' => 'bg-warning',
+                            'paid' => 'bg-info',
+                            'ready_blurred' => 'bg-primary',
+                            'delivered' => 'bg-success',
+                            'failed' => 'bg-danger',
+                        ];
+                        $statusNames = [
+                            'pending' => 'Ожидает',
+                            'paid' => 'Оплачен',
+                            'ready_blurred' => 'Готов',
+                            'delivered' => 'Доставлен',
+                            'failed' => 'Ошибка',
+                        ];
+                        $class = $statusClasses[$order->status] ?? 'bg-secondary';
+                        $name = $statusNames[$order->status] ?? $order->status;
+                        return "<span class='badge {$class}'>{$name}</span>";
+                    }),
 
-                TD::make('session_id', 'Сессия')
-                    ->render(fn (Order $order) => "#{$order->session_id}"),
+                TD::make('created_at', 'Дата заказа')
+                    ->render(fn (Order $order) => $order->created_at->format('d.m.Y H:i')),
+
+                TD::make('paid_at', 'Дата оплаты')
+                    ->render(function (Order $order) {
+                        return $order->paid_at ? $order->paid_at->format('d.m.Y H:i') : '-';
+                    }),
 
                 TD::make('collage', 'Коллаж')
                     ->render(fn (Order $order) => $order->collage->title ?? '-'),
 
-                TD::make('blurred_image', 'Размытое')
+                TD::make('delivery_type', 'Тип получения')
+                    ->render(function (Order $order) {
+                        if (!$order->delivery) {
+                            return '<span class="text-muted">—</span>';
+                        }
+
+                        if ($order->delivery->channel === 'telegram') {
+                            $user = $order->delivery->telegramUser;
+                            $name = $user ? $user->full_name : 'Telegram';
+                            return '<span class="badge bg-info">📱 ' . e($name) . '</span>';
+                        } elseif ($order->delivery->channel === 'email') {
+                            $email = $order->delivery->email ?? 'Email';
+                            return '<span class="badge bg-secondary">📧 ' . e($email) . '</span>';
+                        }
+
+                        return $order->delivery->channel;
+                    }),
+
+                TD::make('actions', 'Действия')
                     ->width('100px')
                     ->render(function (Order $order) {
-                        if (!$order->session || !$order->session->photos) {
-                            return '-';
-                        }
-
-                        $blurredPhoto = $order->session->photos
-                            ->where('type', 'result')
-                            ->where('blur_level', 80)
-                            ->first();
-
-                        if ($blurredPhoto) {
-                            $url = asset('storage/' . $blurredPhoto->path);
-                            return '<a href="' . $url . '" target="_blank">' .
-                                   '<img src="' . $url . '" style="max-width:80px;max-height:60px;border-radius:4px;cursor:pointer;">' .
-                                   '</a>';
-                        }
-                        return '-';
+                        return Link::make('Открыть')
+                            ->icon('eye')
+                            ->route('platform.order.view', $order);
                     }),
-
-                TD::make('ready_image', 'Готовое')
-                    ->width('100px')
-                    ->render(function (Order $order) {
-                        if (!$order->session || !$order->session->photos) {
-                            return '-';
-                        }
-
-                        $readyPhoto = $order->session->photos
-                            ->where('type', 'result')
-                            ->where('blur_level', 0)
-                            ->first();
-
-                        if ($readyPhoto) {
-                            $url = asset('storage/' . $readyPhoto->path);
-                            return '<a href="' . $url . '" target="_blank">' .
-                                   '<img src="' . $url . '" style="max-width:80px;max-height:60px;border-radius:4px;cursor:pointer;">' .
-                                   '</a>';
-                        }
-                        return '-';
-                    }),
-
-                TD::make('price', 'Цена')
-                    ->render(fn (Order $order) => $order->price . ' ₽'),
-
-                TD::make('status', 'Статус')
-                    ->render(function (Order $order) {
-                        $statusNames = [
-                            'pending' => 'Ожидает',
-                            'paid' => 'Оплачен',
-                            'ready_blurred' => 'Готов (размыт)',
-                            'delivered' => 'Доставлен',
-                            'failed' => 'Ошибка',
-                        ];
-                        return $statusNames[$order->status] ?? $order->status;
-                    }),
-
-                TD::make('paid_at', 'Дата оплаты')
-                    ->render(function (Order $order) {
-                        if ($order->paid_at) {
-                            return $order->paid_at->format('d.m.Y H:i');
-                        }
-                        return '-';
-                    }),
-
-                TD::make('created_at', 'Создан')
-                    ->render(fn (Order $order) => $order->created_at->format('d.m.Y H:i')),
             ]),
         ];
     }
