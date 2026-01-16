@@ -12,6 +12,31 @@
       <DeliveryOptions v-else-if="uiStore.currentScreen === 'delivery'" @delivery-sent="onDeliverySent" />
       <ThankYou v-else-if="uiStore.currentScreen === 'thank-you'" />
     </div>
+
+    <!-- Error Dialog -->
+    <Dialog :open="uiStore.showError" @update:open="(val) => !val && uiStore.hideError()">
+      <DialogContent class="bg-gray-800 border-red-500 border-2 text-white sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="text-red-400 text-xl flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {{ uiStore.errorTitle }}
+          </DialogTitle>
+        </DialogHeader>
+        <DialogDescription class="text-gray-300 text-base py-4">
+          {{ uiStore.error }}
+        </DialogDescription>
+        <DialogFooter>
+          <button
+            @click="uiStore.hideError()"
+            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+          >
+            Закрыть
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -30,6 +55,14 @@ import BlurredResult from '../components/BlurredResult.vue';
 import PaymentOptions from '../components/PaymentOptions.vue';
 import DeliveryOptions from '../components/DeliveryOptions.vue';
 import ThankYou from '../components/ThankYou.vue';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 
 const sessionStore = useSessionStore();
 const orderStore = useOrderStore();
@@ -44,6 +77,7 @@ const startSession = async () => {
     uiStore.setCurrentScreen('camera');
   } catch (error) {
     console.error('Failed to start session:', error);
+    uiStore.handleApiError(error, 'Не удалось начать сессию. Попробуйте ещё раз.');
   }
 };
 
@@ -67,6 +101,7 @@ const retakePhoto = () => {
 const confirmPhoto = async () => {
   if (!sessionStore.sessionToken) {
     console.error('No session token available');
+    uiStore.showErrorMessage('Сессия не найдена. Начните заново.');
     return;
   }
 
@@ -81,12 +116,14 @@ const confirmPhoto = async () => {
     uiStore.setCurrentScreen('collage');
   } catch (error) {
     console.error('Failed to upload photo:', error);
+    uiStore.handleApiError(error, 'Не удалось загрузить фото. Попробуйте ещё раз.');
   }
 };
 
 const onCollageSelected = async (collageId: number) => {
   if (!sessionStore.sessionToken) {
     console.error('No session token available');
+    uiStore.showErrorMessage('Сессия не найдена. Начните заново.');
     return;
   }
 
@@ -115,8 +152,9 @@ const onCollageSelected = async (collageId: number) => {
     // TODO: Implement WebSocket listener for order updates
   } catch (error) {
     console.error('Failed to create order:', error);
-    // В случае ошибки можно вернуться на предыдущий экран или показать сообщение об ошибке
-    // Пока просто выводим ошибку в консоль
+    // Возвращаемся к выбору коллажа и показываем ошибку
+    uiStore.setCurrentScreen('collage');
+    uiStore.handleApiError(error, 'Не удалось создать заказ. Попробуйте ещё раз.');
   }
 };
 
